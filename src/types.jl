@@ -3,7 +3,6 @@ struct Dial
 end
 
 Base.split(d::Dial, dlm) = split(d.str, dlm)
-Base.show(io::IO, mime, d::Dial) = show(io, mime, d.str)
 
 function Base.hcat(dl::Dial, dr::Dial)
     buf = IOBuffer()
