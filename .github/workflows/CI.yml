@@ -59,6 +59,6 @@ jobs:
       - run: |
           julia --project=docs -e '
             using Documenter: DocMeta, doctest
-            using Goma
-            DocMeta.setdocmeta!(Goma, :DocTestSetup, :(using Goma); recursive=true)
-            doctest(Goma)'
+            using TerminalClock
+            DocMeta.setdocmeta!(TerminalClock, :DocTestSetup, :(using TerminalClock); recursive=true)
+            doctest(TerminalClock)'
