@@ -28,8 +28,6 @@ function clock()
             m1, m2 = n2d.(divrem(m, 10))
             s1, s2 = n2d.(divrem(s, 10))
             print(buf, hcat(h1, h2, colon, m1, m2, colon, s1, s2).str)
-            # print(buf, hcat(d, d, colon, d, d))
-            # print(buf, "\x1b[999D\x1b[$(H)A") #rollback H-times
             buf |> take! |> String |> print
             sleep(0.5)
             clean(H)
