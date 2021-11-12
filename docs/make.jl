@@ -10,7 +10,7 @@ makedocs(;
     sitename="TerminalClock.jl",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
-        canonical="https://AtelierArith.github.io/TerminalClock.jl",
+        canonical="https://atelierarith.github.io/TerminalClock.jl",
         assets=String[],
     ),
     pages=[
