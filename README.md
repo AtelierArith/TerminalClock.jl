@@ -5,7 +5,7 @@ Display Clock on your Terminal
 
 ```julia
 julia> using TerminalClock
-julia> clock()
+julia> displayclock()
 +-------+ +-------+           +-------+ +-------+           +-------+ +-------+
 |       |         |                   |         |           |       |         |
 |       |         |     ⊗             |         |     ⊗     |       |         |
