@@ -1,7 +1,7 @@
 module TerminalClock
 using Dates
 
-export displayclock, clock, stopwatch
+export displayclock, clock, stopwatch, countdown
 
 include("types.jl")
 include("dials.jl")
@@ -55,6 +55,44 @@ function stopwatch(t::Time)
 end
 
 function stopwatch(duration=0.1)
+const Optional=Union{Nothing, Int}
+
+function setup_timer(hour::Optional, minute::Optional, second::Optional)
+    if all(isnothing.([hour, second, minute]))
+        hour=0
+        minute=3
+        second=0
+    else
+        hour = isnothing(hour) ? 0 : hour
+        minute = isnothing(minute) ? 0 : minute
+        second = isnothing(second) ? 0 : second
+    end
+    return Time(hour, minute, second)
+end
+
+function countdown(;hour=nothing::Optional, minute=nothing::Optional, second=nothing::Optional)
+    countdown(setup_timer(hour, minute, second))
+end
+
+function countdown(t::Time)
+    while true
+        try
+            str = clock(t)
+            println(str)
+            sleep(1)
+            if Dates.hour(t) == Dates.minute(t) == Dates.second(t) == 0
+                break
+            end
+            t -= Second(1)
+            H = length(split(str, "\n"))
+            clean(H)
+        catch e
+            isa(e, InterruptException) || error(e)
+            break
+        end
+    end
+end
+
     start = Dates.now()
     sleep(0.001) # warmup
     while true
