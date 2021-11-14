@@ -10,6 +10,10 @@ Display Clock on your Terminal
 
 # Usage
 
+## `clock()`
+
+- Hey Julian! What time is it now ?
+
 ```julia
 julia> using TerminalClock; clock() # Press Ctrl+C to quit
 +-------+ +-------+           +-------+ +-------+           +-------+ +-------+
@@ -23,6 +27,9 @@ julia> using TerminalClock; clock() # Press Ctrl+C to quit
 +-------+ +-------+           +-------+ +-------+           +-------+ +-------+
 ```
 
+## `stopwatch()`
+
+- On your mark, get set, go! 
 
 ```julia
 julia> using TerminalClock; stopwatch() # Press Ctrl+C to quit
@@ -35,4 +42,21 @@ julia> using TerminalClock; stopwatch() # Press Ctrl+C to quit
 |       | |       |     ⊗     |       | |               +---+ +---+ +---+
 |       | |       |           |       | |           ⊗       |     | |
 +-------+ +-------+           +-------+ +-------+       +---+ +---+ +---+
+```
+
+## `countdown()`
+
+- Would you like to try some Japanese instant noodles?
+
+```julia
+julia> using TerminalClock; countdown() # equivalent to `countdown(hour=0, minute=3, second=0)`
++-------+ +-------+           +-------+ +-------+           +-------+ +-------+
+|       | |       |           |       |         |           |       | |       |
+|       | |       |     ⊗     |       |         |     ⊗     |       | |       |
+|       | |       |           |       |         |           |       | |       |
++       + +       +           +       + +-------+           +       + +       +
+|       | |       |           |       |         |           |       | |       |
+|       | |       |     ⊗     |       |         |     ⊗     |       | |       |
+|       | |       |           |       |         |           |       | |       |
++-------+ +-------+           +-------+ +-------+           +-------+ +-------+
 ```
