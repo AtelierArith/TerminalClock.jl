@@ -1,7 +1,7 @@
 using Test
 
 using TerminalClock
-using TerminalClock: n2d, colon
+using TerminalClock: n2d, colon, setup_timer
 using Dates
 
 @testset "Dial" begin
@@ -32,4 +32,11 @@ end
     str = stopwatch(t)
     txt = joinpath("references", "stopwatch.txt")
     @test str == join(readlines(txt), "\n")
+end
+
+@testset "setup_timer" begin
+    @test setup_timer(hour=1) == Time(1,0,0)
+    @test setup_timer(minute=2) == Time(0,2,0)
+    @test setup_timer(second=3) == Time(0,0,3)
+    @test setup_timer(hour=1,minute=2,second=3) == Time(1,2,3)
 end
