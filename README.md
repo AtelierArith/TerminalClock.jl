@@ -4,12 +4,16 @@
 
 Display Clock on your Terminal
 
-![](readme_assets/demo.gif)
+![](readme_assets/clock.gif | width=100)
+
+<img src="readme_assets/clock.gif" width="400">
+
+<img src="readme_assets/stopwatch.gif" width="400">
 
 # Usage
 
 ```julia
-julia> using TerminalClock; displayclock() # Press Ctrl+C to quit
+julia> using TerminalClock; clock() # Press Ctrl+C to quit
 +-------+ +-------+           +-------+ +-------+           +-------+ +-------+
 |       |         |                   |         |           |       |         |
 |       |         |     ⊗             |         |     ⊗     |       |         |
@@ -19,4 +23,18 @@ julia> using TerminalClock; displayclock() # Press Ctrl+C to quit
 |       |         |     ⊗             |         |     ⊗     |       |         |
 |       |         |                   |         |           |       |         |
 +-------+ +-------+           +-------+ +-------+           +-------+ +-------+
+```
+
+
+```julia
+julia> using TerminalClock; stopwatch() # Press Ctrl+C to quit
++-------+ +-------+           +-------+ +-------+
+|       | |       |           |       |         |
+|       | |       |     ⊗     |       |         |
+|       | |       |           |       |         |
++       + +       +           +       + +-------+       +---+ +---+ +---+
+|       | |       |           |       | |           ⊗   |     |   |     |
+|       | |       |     ⊗     |       | |               +---+ +---+ +---+
+|       | |       |           |       | |           ⊗       |     | |
++-------+ +-------+           +-------+ +-------+       +---+ +---+ +---+
 ```
