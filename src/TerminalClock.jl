@@ -5,6 +5,14 @@ export displayclock
 
 include("types.jl")
 include("dials.jl")
+include("mediumdials.jl")
+include("smalldials.jl")
+
+n2d(n) = N2D[n]
+n2d(n, s::Symbol) = n2d(n, Val(s))
+n2d(n, sz::Val{:normal}) = N2D[n]
+n2d(n, sz::Val{:medium}) = MEDIUMN2D[n]
+n2d(n, sz::Val{:small}) = SMALLN2D[n]
 
 function clean(H)
     buf = IOBuffer()
