@@ -4,8 +4,6 @@
 
 Display Clock on your Terminal
 
-![](readme_assets/clock.gif | width=100)
-
 <img src="readme_assets/clock.gif" width="400">
 
 <img src="readme_assets/stopwatch.gif" width="400">
