@@ -8,6 +8,12 @@ Display Clock on your Terminal
 
 <img src="readme_assets/stopwatch.gif" width="400">
 
+# Installation
+
+```console
+julia -e 'using Pkg Pkg.add("TerminalClock")'
+```
+
 # Usage
 
 ## `clock()`
