@@ -23,4 +23,9 @@ end
     dt = DateTime(2021,11,15,12,34,56,7)
     str = createclock(dt)
     @test str == join(readlines("clock.txt"), "\n")
+@testset "stopwatch" begin
+    t = Time(12,34,56,789)
+    str = stopwatch(t)
+    txt = joinpath("references", "stopwatch.txt")
+    @test str == join(readlines(txt), "\n")
 end
