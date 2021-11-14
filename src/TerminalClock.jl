@@ -1,7 +1,7 @@
 module TerminalClock
 using Dates
 
-export displayclock, clock, stopwatch
+export displayclock, clock, stopwatch, countdown
 
 include("types.jl")
 include("dials.jl")
@@ -9,10 +9,10 @@ include("mediumdials.jl")
 include("smalldials.jl")
 
 n2d(n) = N2D[n]
-n2d(n, s::Symbol) = n2d(n, Val(s))
-n2d(n, sz::Val{:normal}) = N2D[n]
-n2d(n, sz::Val{:medium}) = MEDIUMN2D[n]
-n2d(n, sz::Val{:small}) = SMALLN2D[n]
+n2d(n, s::Symbol) = n2d(n, Val(s)) # symbol dispatcher
+n2d(n, sz::Val{:normal}) = N2D[n] # dials.jl
+n2d(n, sz::Val{:medium}) = MEDIUMN2D[n] # mediumdials.jl
+n2d(n, sz::Val{:small}) = SMALLN2D[n] # smalldials.jl
 
 function clean(H)
     buf = IOBuffer()
@@ -23,11 +23,13 @@ function clean(H)
     print(buf |> take! |> String)
 end
 
-function clock(dt::DateTime)
+clock(dt::DateTime) = clock(Time(dt))
+
+function clock(t::Time)
     buf = IOBuffer()
-    h = hour(dt)
-    m = minute(dt)
-    s = second(dt)
+    h = hour(t)
+    m = minute(t)
+    s = second(t)
     h1, h2 = n2d.(divrem(h, 10))
     m1, m2 = n2d.(divrem(m, 10))
     s1, s2 = n2d.(divrem(s, 10))
@@ -54,7 +56,45 @@ function stopwatch(t::Time)
     return buf |> take! |> String
 end
 
-function stopwatch(duration=0.1)
+const Optional=Union{Nothing, Int}
+
+function setup_timer(;hour=nothing::Optional, minute=nothing::Optional, second=nothing::Optional)
+    if all(isnothing.([hour, second, minute]))
+        hour=0
+        minute=3
+        second=0
+    else
+        hour = isnothing(hour) ? 0 : hour
+        minute = isnothing(minute) ? 0 : minute
+        second = isnothing(second) ? 0 : second
+    end
+    return Time(hour, minute, second)
+end
+
+function countdown(;hour=nothing::Optional, minute=nothing::Optional, second=nothing::Optional)
+    countdown(setup_timer(;hour, minute, second))
+end
+
+function countdown(t::Time)
+    while true
+        try
+            str = clock(t)
+            println(str)
+            sleep(1)
+            if Dates.hour(t) == Dates.minute(t) == Dates.second(t) == 0
+                break
+            end
+            t -= Second(1)
+            H = length(split(str, "\n"))
+            clean(H)
+        catch e
+            isa(e, InterruptException) || error(e)
+            break
+        end
+    end
+end
+
+function stopwatch(duration=0.1::AbstractFloat)
     start = Dates.now()
     sleep(0.001) # warmup
     while true
@@ -66,7 +106,6 @@ function stopwatch(duration=0.1)
             sleep(duration)
             H = length(split(str, "\n"))
             clean(H)
-
         catch e
             isa(e, InterruptException) || error(e)
             break
@@ -90,6 +129,6 @@ function clock()
 end
 
 # deprecated
-displayclock() = clock()
+@deprecate displayclock clock false
 
 end # module
