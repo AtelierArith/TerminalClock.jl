@@ -32,9 +32,9 @@ function displayclock()
     while true
         try
             str = createclock()
-            print(str)
+            println(str)
             sleep(0.5)
-            H = length(split(str, "\n"))-1
+            H = length(split(str, "\n"))
             clean(H)
         catch e
             isa(e, InterruptException) || error(e)
