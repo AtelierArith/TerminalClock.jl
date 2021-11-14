@@ -17,10 +17,9 @@ end
 
 function createclock(dt=Dates.now())
     buf = IOBuffer()
-    n = Dates.now()
-    h = hour(n)
-    m = minute(n)
-    s = second(n)
+    h = hour(dt)
+    m = minute(dt)
+    s = second(dt)
     h1, h2 = n2d.(divrem(h, 10))
     m1, m2 = n2d.(divrem(m, 10))
     s1, s2 = n2d.(divrem(s, 10))
