@@ -5,6 +5,8 @@ on:
       - main
     tags: '*'
   pull_request:
+    paths:
+      '!README.md'
 concurrency:
   # Skip intermediate builds: always.
   # Cancel intermediate builds: only if it is a pull request build.
