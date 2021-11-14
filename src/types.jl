@@ -1,5 +1,6 @@
 struct Dial
     str::String
+    Dial(str::AbstractString) = new(chomp(str))
 end
 
 Base.split(d::Dial, dlm) = split(d.str, dlm)
