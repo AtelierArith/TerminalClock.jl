@@ -1,6 +1,7 @@
 using Test
 
-using TerminalClock: n2d, colon, createclock
+using TerminalClock
+using TerminalClock: n2d, colon
 using Dates
 
 @testset "Dial" begin
@@ -19,10 +20,13 @@ end
     @test length(split(d2, "\n")) == 9
 end
 
-@testset "createclock" begin
+@testset "clock" begin
     dt = DateTime(2021,11,15,12,34,56,7)
-    str = createclock(dt)
-    @test str == join(readlines("clock.txt"), "\n")
+    str = clock(dt)
+    txt = joinpath("references", "clock.txt")
+    @test str == join(readlines(txt), "\n")
+end
+
 @testset "stopwatch" begin
     t = Time(12,34,56,789)
     str = stopwatch(t)

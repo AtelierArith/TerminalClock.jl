@@ -1,7 +1,7 @@
 module TerminalClock
 using Dates
 
-export displayclock
+export displayclock, clock, stopwatch
 
 include("types.jl")
 include("dials.jl")
@@ -23,7 +23,7 @@ function clean(H)
     print(buf |> take! |> String)
 end
 
-function createclock(dt=Dates.now())
+function clock(dt::DateTime)
     buf = IOBuffer()
     h = hour(dt)
     m = minute(dt)
@@ -36,7 +36,6 @@ function createclock(dt=Dates.now())
     return buf |> take! |> String
 end
 
-function displayclock()
 function stopwatch(t::Time)
     buf = IOBuffer()
     h = hour(t)
@@ -74,6 +73,12 @@ function stopwatch(duration=0.1)
         end
     end
 end
+
+function clock()
+    while true
+        try
+            str = clock(Dates.now())
+            println(str)
             sleep(0.5)
             H = length(split(str, "\n"))
             clean(H)
@@ -83,5 +88,8 @@ end
         end
     end
 end
+
+# deprecated
+displayclock() = clock()
 
 end # module
