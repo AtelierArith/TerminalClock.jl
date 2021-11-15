@@ -11,7 +11,7 @@ Display Clock on your Terminal
 # Installation
 
 ```console
-julia -e 'using Pkg Pkg.add("TerminalClock")'
+julia -e 'using Pkg; Pkg.add("TerminalClock")'
 ```
 
 # Usage
