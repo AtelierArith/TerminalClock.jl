@@ -14,13 +14,18 @@ n2d(n, sz::Val{:normal}) = N2D[n] # dials.jl
 n2d(n, sz::Val{:medium}) = MEDIUMN2D[n] # mediumdials.jl
 n2d(n, sz::Val{:small}) = SMALLN2D[n] # smalldials.jl
 
-function clean(H)
+function clearline(; move_up::Bool = false)
     buf = IOBuffer()
-    for i in 1:H
-        print(buf, "\x1b[2K") # clear line
-        print(buf, "\x1b[999D\x1b[$(1)A") # rollback
-    end
+    print(buf, "\x1b[2K") # clear line
+    print(buf, "\x1b[999D") # rollback the cursor
+    move_up && print(buf, "\x1b[1A") # move up
     print(buf |> take! |> String)
+end
+
+function clearlines(H::Integer)
+    for i = 1:H
+        clearline(move_up = true)
+    end
 end
 
 clock(dt::DateTime) = clock(Time(dt))
@@ -86,7 +91,7 @@ function countdown(t::Time)
             end
             t -= Second(1)
             H = length(split(str, "\n"))
-            clean(H)
+            clearlines(H)
         catch e
             isa(e, InterruptException) || error(e)
             break
@@ -105,7 +110,7 @@ function stopwatch(duration=0.1::AbstractFloat)
             println(str)
             sleep(duration)
             H = length(split(str, "\n"))
-            clean(H)
+            clearlines(H)
         catch e
             isa(e, InterruptException) || error(e)
             break
@@ -120,7 +125,7 @@ function clock()
             println(str)
             sleep(0.5)
             H = length(split(str, "\n"))
-            clean(H)
+            clearlines(H)
         catch e
             isa(e, InterruptException) || error(e)
             break
