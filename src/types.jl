@@ -1,6 +1,8 @@
 struct Dial
     str::String
     Dial(str::AbstractString) = new(chomp(str))
+    Dial(str::Vector{String}) = new(join(str, "\n"))
+end
 
 abstract type FontSize end
 struct Small <: FontSize end
