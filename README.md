@@ -69,11 +69,35 @@ julia> using TerminalClock; countdown() # equivalent to `countdown(hour=0, minut
 
 # Another option for dial?
 
-1. Prepare "MyDials.toml" e.g. [src/dials/UnicodeBox.toml](./src/dials/UnicodeBox.toml)
-  - See [Issue 16](https://github.com/AtelierArith/TerminalClock.jl/issues/16)
+1. Prepare "MyDials.toml" e.g. [src/dials/UnicodeBox.toml](./src/dials/UnicodeBox.toml).
+  - See also [Issue 16](https://github.com/AtelierArith/TerminalClock.jl/issues/16).
 2. After that do the following command on your Julia REPL:
 
-```julia
-julia> ENV["TERMINAL_CLOCK_TOML"] = abspath("path/to/MyDials.toml")
+```console
+julia> ENV["TERMINAL_CLOCK_TOML"] = abspath("/path/to/MyDials.toml")
 julia> using Pkg; Pkg.build("TerminalClock")
+```
+
+For example:
+
+```console
+$ julia --quiet
+julia> using TerminalClock
+julia> ENV["TERMINAL_CLOCK_TOML"]=joinpath(dirname(pathof(TerminalClock)), "dials", "UnicodeBox.toml");
+julia> using Pkg; Pkg.build("TerminalClock")
+    Building TerminalClock → `~/work/atelier_arith/TerminalClock.jl/deps/build.log`
+julia> exit() # please restart julia
+$ julia --quiet
+julia> using TerminalClock, Dates
+julia> dt = DateTime(2021, 11, 15, 12, 34, 56, 7)
+julia> print(clock(dt))
+    ░█     ░█████░             ░██████       ░██             ███████    █████  
+   ███     ██   ██░    ▒█▒     ██   ███     ████     ▒█▒     ██        ██   ██ 
+    ██          ██     ███           ██    ██ ██     ███    ▒██        ██      
+    ██         ██      ▒█▒          ░█░   ██  ██     ▒█▒    ██        ██       
+    ██        ██                 █████   ██   ██            ████████░ ████████ 
+    ██       ██        ▒█▒          ░█░ ██    ██     ▒█▒           ██ ██     ██
+    ██      ██         ███           ██ █████████    ███           ██ █       █
+    ██     ██░         ▒█▒     ██    ██       ██     ▒█▒    ██     ██ ███   ███
+   ████    ███████             ░██████        ██             ███████░   █████  
 ```

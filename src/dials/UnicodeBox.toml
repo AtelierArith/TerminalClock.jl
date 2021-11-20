@@ -1,3 +1,7 @@
+# UnicodeBox.toml
+# Based on cormullion-san's idea
+# https://github.com/AtelierArith/TerminalClock.jl/issues/16#issuecomment-974051666
+
 [Large]
 zero = [
 " ▒█████▒ ",
