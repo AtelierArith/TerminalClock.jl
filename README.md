@@ -66,3 +66,14 @@ julia> using TerminalClock; countdown() # equivalent to `countdown(hour=0, minut
 |       | |       |           |       |         |           |       | |       |
 +-------+ +-------+           +-------+ +-------+           +-------+ +-------+
 ```
+
+# Another option for dial?
+
+1. Prepare "MyDials.toml" e.g. [src/dials/UnicodeBox.toml](./src/dials/UnicodeBox.toml)
+  - See [Issue 16](https://github.com/AtelierArith/TerminalClock.jl/issues/16)
+2. After that do the following command on your Julia REPL:
+
+```julia
+julia> ENV["TERMINAL_CLOCK_TOML"] = abspath("path/to/MyDials.toml")
+julia> using Pkg; Pkg.build("TerminalClock")
+```

@@ -1,22 +1,29 @@
 using Test
 
+ENV["TERMINAL_CLOCK_TOML"] = ""
+
+using Pkg
+Pkg.build("TerminalClock")
+
 using TerminalClock
-using TerminalClock: n2d, COLON_NORMAL, setup_timer
+using TerminalClock: n2d, COLON_LARGE, setup_timer
 using Dates
+
+
 
 @testset "Dial" begin
     for n = 0:9
         @test length(split(n2d(n).str, "\n")) == 9
         @test length(split(n2d(n), "\n")) == 9
     end
-    @test length(split(COLON_NORMAL, "\n")) == 9
+    @test length(split(COLON_LARGE, "\n")) == 9
 end
 
 @testset "hcat" begin
     d1 = hcat(n2d(1), n2d(2))
     @test length(split(d1, "\n")) == 9
 
-    d2 = hcat(n2d(1), n2d(2), COLON_NORMAL, n2d(3), n2d(4))
+    d2 = hcat(n2d(1), n2d(2), COLON_LARGE, n2d(3), n2d(4))
     @test length(split(d2, "\n")) == 9
 end
 
