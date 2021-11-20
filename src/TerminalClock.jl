@@ -3,6 +3,8 @@ module TerminalClock
 using Dates
 using TOML
 
+using Configurations
+
 export clock, stopwatch, countdown
 
 include("types.jl")
