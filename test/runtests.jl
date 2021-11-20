@@ -1,5 +1,10 @@
 using Test
 
+ENV["JULIA_TERMINALCLOCK_PREF"] = ""
+
+using Pkg
+Pkg.build("TerminalClock")
+
 using TerminalClock
 using TerminalClock: n2d, COLON_NORMAL, setup_timer
 using Dates
