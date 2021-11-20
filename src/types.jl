@@ -1,3 +1,5 @@
+using Configurations
+
 struct Dial
     str::String
     Dial(str::AbstractString) = new(chomp(str))
