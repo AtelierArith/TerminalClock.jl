@@ -9,11 +9,6 @@ include("dials.jl")
 include("mediumdials.jl")
 include("smalldials.jl")
 
-n2d(n) = N2D[n]
-n2d(n, s::Symbol) = n2d(n, Val(s)) # symbol dispatcher
-n2d(n, sz::Val{:normal}) = N2D[n] # dials.jl
-n2d(n, sz::Val{:medium}) = MEDIUMN2D[n] # mediumdials.jl
-n2d(n, sz::Val{:small}) = SMALLN2D[n] # smalldials.jl
 
 function findpref()
     # remember the user's preference
@@ -24,6 +19,13 @@ function findpref()
 end
 
 toml = findpref() |> TOML.parsefile
+n2d(n::Int, s::Symbol) = n2d(n, Val(s)) # symbol dispatcher
+n2d(n::Int, sz::Val{:large}) = n2d(DIALS_LARGE, n)
+n2d(n::Int, sz::Val{:normal}) = n2d(DIALS_MEDIUM, n)
+n2d(n::Int, sz::Val{:medium}) = n2d(DIALS_MEDIUM, n)
+n2d(n::Int, sz::Val{:small}) = n2d(DIALS_SMALL, n)
+n2d(n::Int) = n2d(n, :medium)
+
 function clearline(; move_up::Bool = false)
     buf = IOBuffer()
     print(buf, "\x1b[2K") # clear line
