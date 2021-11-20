@@ -36,7 +36,7 @@ function clearline(; move_up::Bool = false)
 end
 
 function clearlines(H::Integer)
-    for i = 1:H
+    for _ = 1:H
         clearline(move_up = true)
     end
 end
