@@ -19,7 +19,7 @@ toml = findpref() |> TOML.parsefile
 DIALS_LARGE = from_dict(Dials, toml["Large"])
 DIALS_MEDIUM = from_dict(Dials, toml["Medium"])
 DIALS_SMALL = from_dict(Dials, toml["Small"])
-DIALS_NORMAL = from_dict(Dials, toml["Medium"])
+DIALS_NORMAL = from_dict(Dials, toml["Large"])
 
 COLON_LARGE = colon(DIALS_LARGE)
 COLON_MEDIUM = colon(DIALS_MEDIUM)
@@ -28,7 +28,7 @@ COLON_NORMAL = colon(DIALS_NORMAL)
 
 n2d(n::Int, s::Symbol) = n2d(n, Val(s)) # symbol dispatcher
 n2d(n::Int, sz::Val{:large}) = n2d(DIALS_LARGE, n)
-n2d(n::Int, sz::Val{:normal}) = n2d(DIALS_MEDIUM, n)
+n2d(n::Int, sz::Val{:normal}) = n2d(DIALS_LARGE, n)
 n2d(n::Int, sz::Val{:medium}) = n2d(DIALS_MEDIUM, n)
 n2d(n::Int, sz::Val{:small}) = n2d(DIALS_SMALL, n)
 n2d(n::Int) = n2d(n, :medium)
