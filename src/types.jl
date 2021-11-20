@@ -6,7 +6,6 @@ end
 
 abstract type FontSize end
 struct Small <: FontSize end
-struct Medium <: FontSize end
 struct Large <: FontSize end
 
 @option "dials" struct Dials
