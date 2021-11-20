@@ -1,18 +1,36 @@
 module TerminalClock
+
 using Dates
+using TOML
 
 export clock, stopwatch, countdown
 
 include("types.jl")
-include("dials.jl")
-include("mediumdials.jl")
-include("smalldials.jl")
 
-n2d(n) = N2D[n]
-n2d(n, s::Symbol) = n2d(n, Val(s)) # symbol dispatcher
-n2d(n, sz::Val{:normal}) = N2D[n] # dials.jl
-n2d(n, sz::Val{:medium}) = MEDIUMN2D[n] # mediumdials.jl
-n2d(n, sz::Val{:small}) = SMALLN2D[n] # smalldials.jl
+function findpref()
+    # remember the user's preference
+    prefsfile = joinpath(first(DEPOT_PATH), "prefs", "TerminalClock")
+    pref = get(ENV, "JULIA_TERMINALCLOCK_PREF", isfile(prefsfile) ? prefsfile : joinpath(@__DIR__, "dials/ASCII.toml"))
+    return pref
+end
+
+toml = findpref() |> TOML.parsefile
+DIALS_LARGE = from_dict(Dials, toml["Large"])
+DIALS_MEDIUM = from_dict(Dials, toml["Medium"])
+DIALS_SMALL = from_dict(Dials, toml["Small"])
+DIALS_NORMAL = from_dict(Dials, toml["Large"])
+
+COLON_LARGE = colon(DIALS_LARGE)
+COLON_MEDIUM = colon(DIALS_MEDIUM)
+COLON_SMALL = colon(DIALS_SMALL)
+COLON_NORMAL = colon(DIALS_NORMAL)
+
+n2d(n::Int, s::Symbol) = n2d(n, Val(s)) # symbol dispatcher
+n2d(n::Int, sz::Val{:large}) = n2d(DIALS_LARGE, n)
+n2d(n::Int, sz::Val{:normal}) = n2d(DIALS_LARGE, n)
+n2d(n::Int, sz::Val{:medium}) = n2d(DIALS_MEDIUM, n)
+n2d(n::Int, sz::Val{:small}) = n2d(DIALS_SMALL, n)
+n2d(n::Int) = n2d(n, :medium)
 
 function clearline(; move_up::Bool = false)
     buf = IOBuffer()
@@ -38,7 +56,7 @@ function clock(t::Time)
     h1, h2 = n2d.(divrem(h, 10))
     m1, m2 = n2d.(divrem(m, 10))
     s1, s2 = n2d.(divrem(s, 10))
-    str = hcat(h1, h2, colon, m1, m2, colon, s1, s2).str
+    str = hcat(h1, h2, COLON_NORMAL, m1, m2, COLON_NORMAL, s1, s2).str
     print(buf, str)
     return buf |> take! |> String
 end
@@ -56,7 +74,7 @@ function stopwatch(t::Time)
     ms3 = n2d.(ms3_, :small)
     ms1, ms2 = n2d.(divrem(ms12, 10), :small)
 
-    str = hcat(m1, m2, colon, s1, s2, smallcolon, ms1, ms2, ms3).str
+    str = hcat(m1, m2, COLON_NORMAL, s1, s2, COLON_SMALL, ms1, ms2, ms3).str
     print(buf, str)
     return buf |> take! |> String
 end
