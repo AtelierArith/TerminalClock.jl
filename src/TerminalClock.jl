@@ -15,6 +15,15 @@ n2d(n, sz::Val{:normal}) = N2D[n] # dials.jl
 n2d(n, sz::Val{:medium}) = MEDIUMN2D[n] # mediumdials.jl
 n2d(n, sz::Val{:small}) = SMALLN2D[n] # smalldials.jl
 
+function findpref()
+    # remember the user's preference
+    prefsfile = joinpath(first(DEPOT_PATH), "prefs", "TerminalClock", "Pref.toml")
+    mkpath(dirname(prefsfile))
+    pref = get(ENV, "JULIA_TERMINALCLOCK_PREF", isfile(prefsfile) ? prefsfile : joinpath(@__DIR__, "dials/ASCII.toml"))
+    return pref
+end
+
+toml = findpref() |> TOML.parsefile
 function clearline(; move_up::Bool = false)
     buf = IOBuffer()
     print(buf, "\x1b[2K") # clear line
