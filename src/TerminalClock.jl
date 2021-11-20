@@ -1,5 +1,6 @@
 module TerminalClock
 using Dates
+using TOML
 
 export clock, stopwatch, countdown
 
