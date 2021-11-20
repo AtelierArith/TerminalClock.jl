@@ -23,8 +23,8 @@ COLON_LARGE = colon(DIALS_LARGE)
 COLON_SMALL = colon(DIALS_SMALL)
 
 n2d(n::Int, s::Symbol) = n2d(n, Val(s)) # symbol dispatcher
-n2d(n::Int, sz::Val{:large}) = n2d(DIALS_LARGE, n)
-n2d(n::Int, sz::Val{:small}) = n2d(DIALS_SMALL, n)
+n2d(n::Int, ::Val{:large}) = n2d(DIALS_LARGE, n)
+n2d(n::Int, ::Val{:small}) = n2d(DIALS_SMALL, n)
 n2d(n::Int) = n2d(n, :large)
 
 function clearline(; move_up::Bool = false)
@@ -36,7 +36,7 @@ function clearline(; move_up::Bool = false)
 end
 
 function clearlines(H::Integer)
-    for i = 1:H
+    for _ = 1:H
         clearline(move_up = true)
     end
 end
