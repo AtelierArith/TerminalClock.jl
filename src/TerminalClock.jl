@@ -9,8 +9,7 @@ include("types.jl")
 
 function findpref()
     # remember the user's preference
-    prefsfile = joinpath(first(DEPOT_PATH), "prefs", "TerminalClock", "Pref.toml")
-    mkpath(dirname(prefsfile))
+    prefsfile = joinpath(first(DEPOT_PATH), "prefs", "TerminalClock")
     pref = get(ENV, "JULIA_TERMINALCLOCK_PREF", isfile(prefsfile) ? prefsfile : joinpath(@__DIR__, "dials/ASCII.toml"))
     return pref
 end
