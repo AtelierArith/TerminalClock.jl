@@ -1,14 +1,11 @@
 module TerminalClock
+
 using Dates
 using TOML
 
 export clock, stopwatch, countdown
 
 include("types.jl")
-include("dials.jl")
-include("mediumdials.jl")
-include("smalldials.jl")
-
 
 function findpref()
     # remember the user's preference
