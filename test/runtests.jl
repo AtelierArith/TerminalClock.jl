@@ -16,7 +16,7 @@ end
     d1 = hcat(n2d(1), n2d(2))
     @test length(split(d1, "\n")) == 9
 
-    d2 = hcat(n2d(1), n2d(2), COLON_MEDIUM, n2d(3), n2d(4))
+    d2 = hcat(n2d(1), n2d(2), COLON_NORMAL, n2d(3), n2d(4))
     @test length(split(d2, "\n")) == 9
 end
 
