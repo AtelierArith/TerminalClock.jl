@@ -52,9 +52,9 @@ function n2d(dials::Dials, n::Int)
 end
 
 n2d(n::Int, s::Symbol) = n2d(n, Val(s)) # symbol dispatcher
-n2d(n::Int, ::Val{:large}) = n2d(DIALS_LARGE, n)
-n2d(n::Int, ::Val{:small}) = n2d(DIALS_SMALL, n)
-n2d(n::Int) = n2d(n, :large)
+n2d(n::Int, ::Val{:Large}) = n2d(DIALS_LARGE, n)
+n2d(n::Int, ::Val{:Small}) = n2d(DIALS_SMALL, n)
+n2d(n::Int) = n2d(n, :Large)
 
 function clearline(; move_up::Bool = false)
     buf = IOBuffer()
@@ -95,8 +95,8 @@ function stopwatch(t::Time)
     m1, m2 = n2d.(divrem(m, 10))
     s1, s2 = n2d.(divrem(s, 10))
     ms12, ms3_ = divrem(ms, 10)
-    ms3 = n2d.(ms3_, :small)
-    ms1, ms2 = n2d.(divrem(ms12, 10), :small)
+    ms3 = n2d.(ms3_, :Small)
+    ms1, ms2 = n2d.(divrem(ms12, 10), :Small)
 
     str = hcat(m1, m2, COLON_LARGE, s1, s2, COLON_SMALL, ms1, ms2, ms3).str
     print(buf, str)
