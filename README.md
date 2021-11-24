@@ -69,13 +69,15 @@ julia> using TerminalClock; countdown() # equivalent to `countdown(hour=0, minut
 
 # Another option for dial?
 
-1. Prepare "MyDials.toml" e.g. [src/dials/UnicodeBox.toml](./src/dials/UnicodeBox.toml).
+1. Prepare "YourDials.toml" e.g. [src/dials/UnicodeBox.toml](./src/dials/UnicodeBox.toml).
   - See also [Issue 16](https://github.com/AtelierArith/TerminalClock.jl/issues/16).
 2. After that do the following command on your Julia REPL:
 
 ```console
-julia> ENV["TERMINAL_CLOCK_TOML"] = abspath("/path/to/MyDials.toml")
-julia> using Pkg; Pkg.build("TerminalClock")
+julia> using TerminalClock
+julia> tomlfile = joinpath(dirname(pathof(TerminalClock)), "dials", "UnicodeBox.toml");
+julia> TerminalClock.set_dials("/path/to/YourDials.toml")
+[ Info: New dials set; restart your Julia session for this change to take effect!
 ```
 
 For example:
@@ -83,13 +85,13 @@ For example:
 ```console
 $ julia --quiet
 julia> using TerminalClock
-julia> ENV["TERMINAL_CLOCK_TOML"]=joinpath(dirname(pathof(TerminalClock)), "dials", "UnicodeBox.toml");
-julia> using Pkg; Pkg.build("TerminalClock")
-    Building TerminalClock → `~/work/atelier_arith/TerminalClock.jl/deps/build.log`
+julia> tomlfile = joinpath(dirname(pathof(TerminalClock)), "dials", "UnicodeBox.toml");
+julia> TerminalClock.set_dials(tomlfile)
+[ Info: New dials set; restart your Julia session for this change to take effect!
 julia> exit() # please restart julia
 $ julia --quiet
 julia> using TerminalClock, Dates
-julia> dt = DateTime(2021, 11, 15, 12, 34, 56, 7)
+julia> dt = DateTime(2021, 11, 15, 12, 34, 56, 7);
 julia> print(clock(dt))
     ░█     ░█████░             ░██████       ░██             ███████    █████  
    ███     ██   ██░    ▒█▒     ██   ███     ████     ▒█▒     ██        ██   ██ 
@@ -99,5 +101,21 @@ julia> print(clock(dt))
     ██       ██        ▒█▒          ░█░ ██    ██     ▒█▒           ██ ██     ██
     ██      ██         ███           ██ █████████    ███           ██ █       █
     ██     ██░         ▒█▒     ██    ██       ██     ▒█▒    ██     ██ ███   ███
-   ████    ███████             ░██████        ██             ███████░   █████  
+   ████    ███████             ░██████        ██             ███████░   █████
+julia> TerminalClock.clear_dials() # you can clear preferences from `YourDials`.
+[ Info: Dials cleared; restart your Julia session for this change to take effect!
+julia> exit()
+$ julia --quiet
+julia> using TerminalClock, Dates
+julia> dt = DateTime(2021, 11, 15, 12, 34, 56, 7);
+julia> print(clock(dt))
+        + +-------+           +-------+ +       +           +-------+ +-------+
+        |         |                   | |       |           |         |
+        |         |     ⊗             | |       |     ⊗     |         |
+        |         |                   | |       |           |         |
+        + +-------+           +-------+ +-------+           +-------+ +-------+
+        | |                           |         |                   | |       |
+        | |             ⊗             |         |     ⊗             | |       |
+        | |                           |         |                   | |       |
+        + +-------+           +-------+         +           +-------+ +-------+
 ```
