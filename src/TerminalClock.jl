@@ -29,13 +29,13 @@ function load_dials()
 end
 
 const toml = load_dials()
-DIALS_LARGE = from_dict(Dials, toml["Large"])
-DIALS_SMALL = from_dict(Dials, get(toml, "Small", toml["Large"]))
+const DIALS_LARGE = from_dict(Dials, toml["Large"])
+const DIALS_SMALL = from_dict(Dials, get(toml, "Small", toml["Large"]))
 
 colon(dial::Dials) = Dial(getfield(dial, :colon))
 
-COLON_LARGE = colon(DIALS_LARGE)
-COLON_SMALL = colon(DIALS_SMALL)
+const COLON_LARGE = colon(DIALS_LARGE)
+const COLON_SMALL = colon(DIALS_SMALL)
 
 function n2d(dials::Dials, n::Int)
     n == 0 && return Dial(getfield(dials, :zero))
