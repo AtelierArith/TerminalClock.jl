@@ -47,3 +47,56 @@ end
     @test setup_timer(second = 3) == Time(0, 0, 3)
     @test setup_timer(hour = 1, minute = 2, second = 3) == Time(1, 2, 3)
 end
+
+@testset "preference" begin
+    local_prefs_toml = joinpath(dirname(dirname(pathof(TerminalClock))), "LocalPreferences.toml")
+    rm(local_prefs_toml; force=true)
+    with_temp_depot() do
+        project_dir = joinpath(dirname(@__DIR__,))
+
+        # test for set_dials
+        activate_and_run(project_dir, """
+            using Pkg; Pkg.instantiate()
+            using TerminalClock
+            unicodebox = joinpath(dirname(pathof(TerminalClock)), "dials", "UnicodeBox.toml")
+            TerminalClock.set_dials(unicodebox)
+        """)
+        prefs = local_prefs_toml |> TOML.parsefile
+        @test haskey(prefs, "TerminalClock")
+        @test basename(prefs["TerminalClock"]["tomlfile"]) == "UnicodeBox.toml"
+
+        activate_and_run(project_dir, """
+            using Test
+            using TerminalClock, Dates
+            dt = DateTime(2021, 11, 15, 12, 34, 56, 7)
+            str = clock(dt)
+            txt = joinpath("references", "UnicodeBox", "clock.txt")
+            @test str == join(readlines(txt), "\n")
+
+            t = Time(12, 34, 56, 789)
+            str = stopwatch(t)
+            txt = joinpath("references", "UnicodeBox", "stopwatch.txt")
+            @test str == join(readlines(txt), "\n")
+        """)
+
+        # test for clear_dials
+        activate_and_run(project_dir, """
+            using TerminalClock
+            TerminalClock.clear_dials()
+        """)
+
+        activate_and_run(project_dir, """
+            using Test
+            using TerminalClock, Dates
+            dt = DateTime(2021, 11, 15, 12, 34, 56, 7)
+            str = clock(dt)
+            txt = joinpath("references", "ASCII", "clock.txt")
+            @test str == join(readlines(txt), "\n")
+
+            t = Time(12, 34, 56, 789)
+            str = stopwatch(t)
+            txt = joinpath("references", "ASCII", "stopwatch.txt")
+            @test str == join(readlines(txt), "\n")
+        """)
+    end # with_temp_depot
+end
