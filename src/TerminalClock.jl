@@ -34,7 +34,7 @@ end
 
 const toml = load_dials()
 DIALS_LARGE = from_dict(Dials, toml["Large"])
-DIALS_SMALL = from_dict(Dials, toml["Small"])
+DIALS_SMALL = from_dict(Dials, get(toml, "Small", toml["Large"]))
 
 COLON_LARGE = colon(DIALS_LARGE)
 COLON_SMALL = colon(DIALS_SMALL)
