@@ -1,15 +1,46 @@
 using Test
 
-ENV["TERMINAL_CLOCK_TOML"] = ""
-
-using Pkg
-Pkg.build("TerminalClock")
-
 using TerminalClock
 using TerminalClock: n2d, COLON_LARGE, setup_timer
 using Dates
+using TOML
 
+# Taken from Prefernces.jl/test/runtests.jl
+function with_temp_depot(f::Function)
+    mktempdir() do dir
+        saved_depot_path = copy(Base.DEPOT_PATH)
+        empty!(Base.DEPOT_PATH)
+        push!(Base.DEPOT_PATH, dir)
+        try
+            f()
+        finally
+            empty!(Base.DEPOT_PATH)
+            append!(Base.DEPOT_PATH, saved_depot_path)
+        end
+    end
+end
 
+# Taken from Prefernces.jl/test/runtests.jl
+function activate_and_run(project_dir::String, code::String; env::Dict = Dict())
+    mktempdir() do dir
+        open(joinpath(dir, "test_code.jl"), "w") do io
+            write(io, code)
+        end
+
+        out = Pipe()
+        cmd = setenv(`$(Base.julia_cmd()) --project=$(project_dir) $(dir)/test_code.jl`,
+                     env..., "JULIA_DEPOT_PATH" => Base.DEPOT_PATH[1])
+        p = run(pipeline(cmd, stdout=out, stderr=out); wait=false)
+        close(out.in)
+        wait(p)
+        output = String(read(out))
+        if !success(p)
+            println(output)
+        end
+        @test success(p)
+        return output
+    end
+end
 
 @testset "Dial" begin
     for n = 0:9
