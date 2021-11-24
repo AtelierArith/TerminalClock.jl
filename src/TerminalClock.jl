@@ -4,6 +4,7 @@ using Dates
 using TOML
 
 using Configurations
+using Preferences
 
 export clock, stopwatch, countdown
 
@@ -16,6 +17,15 @@ default_tomlfile() = joinpath(dirname(@__FILE__), "dials", "ASCII.toml")
 
 # TERMINAL_CLOCK_TOML is generated via Pkg.build("TerminalClock")
 toml = TERMINAL_CLOCK_TOML |> TOML.parsefile
+function set_dials(tomlfile::AbstractString)
+    @set_preferences!("tomlfile" => tomlfile)
+    @info("New dials set; restart your Julia session for this change to take effect!")
+end
+
+function clear_dials()
+    @set_preferences!("tomlfile" => nothing)
+    @info("Dials cleared; restart your Julia session for this change to take effect!")
+end
 
 DIALS_LARGE = from_dict(Dials, toml["Large"])
 DIALS_SMALL = from_dict(Dials, toml["Small"])
