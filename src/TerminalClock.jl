@@ -32,8 +32,24 @@ const toml = load_dials()
 DIALS_LARGE = from_dict(Dials, toml["Large"])
 DIALS_SMALL = from_dict(Dials, get(toml, "Small", toml["Large"]))
 
+colon(dial::Dials) = Dial(getfield(dial, :colon))
+
 COLON_LARGE = colon(DIALS_LARGE)
 COLON_SMALL = colon(DIALS_SMALL)
+
+function n2d(dials::Dials, n::Int)
+    n == 0 && return Dial(getfield(dials, :zero))
+    n == 1 && return Dial(getfield(dials, :one))
+    n == 2 && return Dial(getfield(dials, :two))
+    n == 3 && return Dial(getfield(dials, :three))
+    n == 4 && return Dial(getfield(dials, :four))
+    n == 5 && return Dial(getfield(dials, :five))
+    n == 6 && return Dial(getfield(dials, :six))
+    n == 7 && return Dial(getfield(dials, :seven))
+    n == 8 && return Dial(getfield(dials, :eight))
+    n == 9 && return Dial(getfield(dials, :nine))
+    DomainError("n should satisfy 0≤ n ≤9, actual $n")
+end
 
 n2d(n::Int, s::Symbol) = n2d(n, Val(s)) # symbol dispatcher
 n2d(n::Int, ::Val{:large}) = n2d(DIALS_LARGE, n)
