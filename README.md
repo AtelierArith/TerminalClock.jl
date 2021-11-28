@@ -119,3 +119,8 @@ julia> print(clock(dt))
         | |                           |         |                   | |       |
         + +-------+           +-------+         +           +-------+ +-------+
 ```
+
+# Appendix
+
+- [Julia Discourse](https://discourse.julialang.org/t/ann-terminalclock-jl/71650)
+- [Zenn.dev (web post written in Japanese)](https://zenn.dev/terasakisatoshi/articles/4416c268ed966c)
