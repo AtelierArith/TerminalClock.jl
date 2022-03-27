@@ -1,7 +1,7 @@
 name = "TerminalClock"
 uuid = "65687e93-20ea-45b9-bbc3-ed39219e1d43"
 authors = ["Satoshi Terasaki <terasakisatoshi.math@gmail.com>"]
-version = "0.4.0"
+version = "0.4.1"
 
 [deps]
 Configurations = "5218b696-f38b-4ac9-8b61-a12ec717816d"
