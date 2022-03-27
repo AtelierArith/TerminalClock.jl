@@ -1,7 +1,12 @@
 using TerminalClock
 using Documenter
 
-DocMeta.setdocmeta!(TerminalClock, :DocTestSetup, :(using TerminalClock); recursive=true)
+DocMeta.setdocmeta!(
+    TerminalClock,
+    :DocTestSetup,
+    :(using TerminalClock);
+    recursive=true,
+)
 
 makedocs(;
     modules=[TerminalClock],
