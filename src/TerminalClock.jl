@@ -56,7 +56,7 @@ n2d(n::Int, ::Val{:Large}) = n2d(DIALS_LARGE, n)
 n2d(n::Int, ::Val{:Small}) = n2d(DIALS_SMALL, n)
 n2d(n::Int) = n2d(n, :Large)
 
-function clearline(; move_up::Bool = false)
+function clearline(; move_up::Bool=false)
     buf = IOBuffer()
     print(buf, "\x1b[2K") # clear line
     print(buf, "\x1b[999D") # rollback the cursor
@@ -65,8 +65,8 @@ function clearline(; move_up::Bool = false)
 end
 
 function clearlines(H::Integer)
-    for _ = 1:H
-        clearline(move_up = true)
+    for _ in 1:H
+        clearline(move_up=true)
     end
 end
 
@@ -105,7 +105,11 @@ end
 
 const Optional = Union{Nothing,Int}
 
-function setup_timer(; hour = nothing::Optional, minute = nothing::Optional, second = nothing::Optional)
+function setup_timer(;
+    hour=nothing::Optional,
+    minute=nothing::Optional,
+    second=nothing::Optional,
+)
     if all(isnothing.([hour, second, minute]))
         hour = 0
         minute = 3
@@ -118,7 +122,11 @@ function setup_timer(; hour = nothing::Optional, minute = nothing::Optional, sec
     return Time(hour, minute, second)
 end
 
-function countdown(; hour = nothing::Optional, minute = nothing::Optional, second = nothing::Optional)
+function countdown(;
+    hour=nothing::Optional,
+    minute=nothing::Optional,
+    second=nothing::Optional,
+)
     countdown(setup_timer(; hour, minute, second))
 end
 
@@ -141,13 +149,14 @@ function countdown(t::Time)
     end
 end
 
-function stopwatch(duration = 0.1::AbstractFloat)
+function stopwatch(duration=0.1::AbstractFloat)
     start = Dates.now()
     sleep(0.001) # warmup
     while true
         try
             Δ = Dates.now() - start # millisecond
-            periods = Dates.canonicalize(Dates.CompoundPeriod(Dates.Millisecond(Δ))).periods
+            periods =
+                Dates.canonicalize(Dates.CompoundPeriod(Dates.Millisecond(Δ))).periods
             str = stopwatch(Time(periods...))
             println(str)
             sleep(duration)
