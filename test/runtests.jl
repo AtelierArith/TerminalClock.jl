@@ -197,6 +197,7 @@ end
 include("verification.jl")
 
 @testset "stopwatch timing" begin
+    @test TerminalClock._elapsed_time(UInt64(86_400_123_000_000)) == Time(0, 0, 0, 123)
     ticks = Ref(UInt64(0))
     shown = Time[]
     TerminalClock._stopwatch(0.1;

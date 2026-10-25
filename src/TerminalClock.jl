@@ -159,6 +159,9 @@ end
 
 countdown(t::Time) = _countdown(t)
 
+_elapsed_time(ns::Unsigned) =
+    Time(0) + Nanosecond(Int64(ns % UInt64(86_400_000_000_000)))
+
 function _stopwatch(duration::AbstractFloat; now_ns=time_ns, wait=sleep,
                     render=t -> println(stopwatch(t)), clear=clearlines)
     isfinite(duration) && duration > 0 ||
@@ -167,7 +170,7 @@ function _stopwatch(duration::AbstractFloat; now_ns=time_ns, wait=sleep,
     try
         while true
             elapsed = now_ns() - start
-            t = Time(0) + Nanosecond(Int64(elapsed % UInt64(86_400_000_000_000)))
+            t = _elapsed_time(elapsed)
             render(t)
             wait(duration)
             clear(length(split(stopwatch(t), "\n")))
