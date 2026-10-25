@@ -193,3 +193,5 @@ end
     @test_throws DomainError n2d(-1)
     @test_throws DomainError n2d(10)
 end
+
+include("verification.jl")

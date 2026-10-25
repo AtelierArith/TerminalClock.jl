@@ -1,7 +1,7 @@
 name = "TerminalClock"
 uuid = "65687e93-20ea-45b9-bbc3-ed39219e1d43"
-authors = ["Satoshi Terasaki <terasakisatoshi.math@gmail.com>"]
 version = "0.4.1"
+authors = ["Satoshi Terasaki <terasakisatoshi.math@gmail.com>"]
 
 [deps]
 Configurations = "5218b696-f38b-4ac9-8b61-a12ec717816d"
@@ -10,13 +10,21 @@ Preferences = "21216c6a-2e73-6563-6e65-726566657250"
 TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 
 [compat]
+Aqua = "0.8"
+JET = "0.9, 0.10, 0.11, 0.12"
+Dates = "1.10"
+Pkg = "1.10"
+TOML = "1"
+Test = "1.10"
 Configurations = "0.17.0"
 Preferences = "1.2.2"
 julia = "1.10"
 
 [extras]
+Aqua = "4c88cf16-eb10-579e-8560-4a9242c79595"
+JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "Pkg"]
+test = ["Test", "Pkg", "Aqua", "JET"]
