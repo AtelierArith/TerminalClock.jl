@@ -12,11 +12,27 @@ include("types.jl")
 
 default_tomlfile() = joinpath(dirname(@__FILE__), "dials", "ASCII.toml")
 
+"""
+    TerminalClock.set_dials(tomlfile::AbstractString)
+
+Save the path to a TOML dial file in the active environment's preferences.
+Use an absolute path and restart Julia to load the new dials. The file must
+contain a complete `[Large]` table; `[Small]` is optional.
+
+The file is loaded on the next import, so an invalid path or TOML file can
+prevent `using TerminalClock`. See [Custom dials](@ref custom-dials).
+"""
 function set_dials(tomlfile::AbstractString)
     @set_preferences!("tomlfile" => tomlfile)
     @info("New dials set; restart your Julia session for this change to take effect!")
 end
 
+"""
+    TerminalClock.clear_dials()
+
+Clear the saved dial preference. Restart Julia to load the bundled ASCII dials.
+This changes preferences for the active environment, not the current display.
+"""
 function clear_dials()
     @set_preferences!("tomlfile" => nothing)
     @info("Dials cleared; restart your Julia session for this change to take effect!")
@@ -69,6 +85,26 @@ function clearlines(H::Integer)
     print(repeat("\x1b[2K\x1b[999D\x1b[1A", H))
 end
 
+"""
+    clock()
+    clock(t::Dates.Time) -> String
+    clock(dt::Dates.DateTime) -> String
+
+Display the current local wall-clock time as `HH:MM:SS` until Ctrl+C.
+The live display refreshes approximately every 0.5 seconds.
+
+Passing a `Time` or `DateTime` instead returns one dial frame without printing
+or sleeping; the date and subsecond fields are ignored.
+
+# Examples
+
+```jldoctest
+julia> using Dates
+
+julia> clock(Time(12, 34, 56)) == clock(DateTime(2026, 1, 1, 12, 34, 56))
+true
+```
+"""
 clock(dt::DateTime) = clock(Time(dt))
 
 function clock(t::Time)
@@ -84,6 +120,28 @@ function clock(t::Time)
     return buf |> take! |> String
 end
 
+"""
+    stopwatch(refresh_interval::AbstractFloat=0.01)
+    stopwatch(t::Dates.Time) -> String
+
+Display elapsed time as `MM:SS:mmm` until Ctrl+C. The interval is in seconds
+and must be finite and positive. Elapsed time uses a monotonic clock, and
+rendering time is deducted from the wait before the next refresh.
+
+Passing a `Time` returns a single frame without printing or waiting.
+Only its minute, second, and millisecond fields are shown: the visible minute
+counter wraps after 59. Millisecond digits indicate resolution, not a guarantee
+that the screen updates every millisecond. See [Timer accuracy](@ref timer-accuracy).
+
+# Examples
+
+```jldoctest
+julia> using Dates
+
+julia> stopwatch(Time(1, 2, 3, 456)) == stopwatch(Time(0, 2, 3, 456))
+true
+```
+"""
 function stopwatch(t::Time)
     buf = IOBuffer()
     h = hour(t)
@@ -121,6 +179,30 @@ function setup_timer(;
     return Time(hour, minute, second)
 end
 
+"""
+    countdown(; hour=nothing, minute=nothing, second=nothing)
+    countdown(t::Dates.Time)
+
+Run a countdown displaying `HH:MM:SS`, then return `nothing` after printing
+zero. With no arguments, count down three minutes. If any keyword is supplied,
+omitted components are zero. Components follow `Dates.Time` ranges:
+hours 0–23, minutes 0–59, and seconds 0–59.
+
+A `Time` is interpreted as a duration since midnight, including its subsecond
+part. Remaining seconds are rounded up. A monotonic clock prevents rendering
+and scheduler delays from accumulating; a slow terminal can delay an update.
+There is no extra sleep after zero. Press Ctrl+C to stop early.
+
+# Examples
+
+These calls block while the timer runs:
+
+```julia
+countdown(minute=10)
+countdown(hour=1, minute=30)
+countdown(Dates.Time(0, 0, 0, 500)) # half a second
+```
+"""
 function countdown(;
     hour=nothing::Optional,
     minute=nothing::Optional,
