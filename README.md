@@ -1,8 +1,13 @@
 # TerminalClock.jl
 
+[![Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://atelierarith.github.io/TerminalClock.jl/dev/)
+
 [![CI](https://github.com/AtelierArith/TerminalClock.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/AtelierArith/TerminalClock.jl/actions/workflows/CI.yml)
 
 Display Clock on your Terminal
+
+Read the [documentation](https://atelierarith.github.io/TerminalClock.jl/dev/)
+for usage, timer accuracy, custom dials, API reference, and development instructions.
 
 Supported Julia versions: 1.10 and the latest stable release.
 

@@ -5,11 +5,9 @@ on:
       - main
     tags: '*'
   pull_request:
-    paths-ignore:
-      - 'README.md'
+  workflow_dispatch:
 permissions:
   contents: read
-  actions: write
 concurrency:
   # Skip intermediate builds: always.
   # Cancel intermediate builds: only if it is a pull request build.
@@ -19,6 +17,10 @@ jobs:
   test:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    permissions:
+      actions: write
+      contents: read
     strategy:
       fail-fast: false
       matrix:
@@ -38,13 +40,17 @@ jobs:
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
       - name: REPL pseudo-terminal smoke tests
+        timeout-minutes: 5
         if: runner.os != 'Windows'
         run: |
           julia --project test/repl_accuracy.jl stopwatch 2
           julia --project test/repl_accuracy.jl countdown 2
   docs:
+    timeout-minutes: 30
     permissions:
+      actions: write
       contents: write
+      statuses: write
     name: Documentation
     runs-on: ubuntu-latest
     steps:
@@ -52,14 +58,16 @@ jobs:
       - uses: julia-actions/setup-julia@v3
         with:
           version: '1'
+      - uses: julia-actions/cache@v3
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-docdeploy@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
-      - run: |
-          julia --project=docs -e '
-            using Documenter: DocMeta, doctest
-            using TerminalClock
-            DocMeta.setdocmeta!(TerminalClock, :DocTestSetup, :(using TerminalClock); recursive=true)
-            doctest(TerminalClock)'
+      - name: Run doctests
+        shell: julia --project=docs --color=yes {0}
+        run: |
+          using Documenter: DocMeta, doctest
+          using TerminalClock, Dates
+          DocMeta.setdocmeta!(TerminalClock, :DocTestSetup, :(using TerminalClock, Dates); recursive=true)
+          doctest(TerminalClock)
