@@ -4,6 +4,8 @@
 
 Display Clock on your Terminal
 
+Supported Julia versions: 1.10 and the latest stable release.
+
 <img src="readme_assets/clock.gif" width="400">
 
 <img src="readme_assets/stopwatch.gif" width="400">
@@ -53,6 +55,10 @@ julia> using TerminalClock; stopwatch() # Press Ctrl+C to quit
 ## `countdown()`
 
 - Would you like to try some Japanese instant noodles?
+
+The countdown uses a monotonic clock to avoid accumulating rendering and sleep
+delays. It displays remaining seconds rounded up and returns after displaying zero.
+Terminal output and OS scheduling can delay the final update; this is not a real-time timer.
 
 ```julia
 julia> using TerminalClock; countdown() # equivalent to `countdown(hour=0, minute=3, second=0)`

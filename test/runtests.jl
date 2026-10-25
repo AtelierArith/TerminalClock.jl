@@ -52,6 +52,7 @@ end
 end
 
 @testset "hcat" begin
+    @test hcat(n2d(1)).str == n2d(1).str
     d1 = hcat(n2d(1), n2d(2))
     @test length(split(d1, "\n")) == 9
 
@@ -144,4 +145,51 @@ end
 """,
         )
     end # with_temp_depot
+end
+
+@testset "countdown timing" begin
+    function simulate(t; render_ns=0, oversleep_ns=0)
+        ticks = Ref(UInt64(0))
+        frames = Tuple{Float64,Time}[]
+        waits = Float64[]
+        TerminalClock._countdown(t;
+            now_ns=() -> ticks[],
+            wait=seconds -> begin
+                push!(waits, seconds)
+                ticks[] += round(UInt64, seconds * 1e9) + oversleep_ns
+            end,
+            render=shown -> begin
+                push!(frames, (ticks[] / 1e9, shown))
+                ticks[] += render_ns
+            end,
+            clear=_ -> nothing)
+        return frames, waits, ticks[] / 1e9
+    end
+
+    frames, waits, elapsed = simulate(Time(0, 10); render_ns=20_000_000,
+                                     oversleep_ns=5_000_000)
+    @test frames[1] == (0.0, Time(0, 10))
+    @test frames[end][2] == Time(0)
+    @test 600 <= frames[end][1] <= 600.01
+    @test elapsed < 600.1
+    @test length(waits) == 600
+
+    frames, waits, elapsed = simulate(Time(0))
+    @test frames == [(0.0, Time(0))]
+    @test isempty(waits)
+    @test elapsed == 0
+
+    frames, _, elapsed = simulate(Time(0, 0, 4); render_ns=1_500_000_000)
+    @test last.(frames) == [Time(0, 0, 4), Time(0, 0, 3), Time(0, 0, 1), Time(0)]
+    @test frames[end][1] == 4.5
+
+    frames, _, _ = simulate(Time(0, 0, 0, 500))
+    @test first(frames)[2] == Time(0, 0, 1)
+    @test last(frames) == (0.5, Time(0))
+
+    @test TerminalClock._countdown(Time(0); render=_ -> throw(InterruptException())) === nothing
+    @test_throws ArgumentError TerminalClock._countdown(Time(0);
+        render=_ -> throw(ArgumentError("render failed")))
+    @test_throws DomainError n2d(-1)
+    @test_throws DomainError n2d(10)
 end

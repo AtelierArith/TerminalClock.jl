@@ -48,7 +48,7 @@ function n2d(dials::Dials, n::Int)
     n == 7 && return Dial(getfield(dials, :seven))
     n == 8 && return Dial(getfield(dials, :eight))
     n == 9 && return Dial(getfield(dials, :nine))
-    DomainError("n should satisfy 0≤ n ≤9, actual $n")
+    throw(DomainError(n, "n should satisfy 0≤ n ≤9"))
 end
 
 n2d(n::Int, s::Symbol) = n2d(n, Val(s)) # symbol dispatcher
@@ -130,24 +130,34 @@ function countdown(;
     countdown(setup_timer(; hour, minute, second))
 end
 
-function countdown(t::Time)
-    while true
-        try
-            str = clock(t)
-            println(str)
-            sleep(1)
-            if Dates.hour(t) == Dates.minute(t) == Dates.second(t) == 0
-                break
-            end
-            t -= Second(1)
-            H = length(split(str, "\n"))
-            clearlines(H)
-        catch e
-            isa(e, InterruptException) || error(e)
-            break
+# Keep time independently of rendering and scheduler delays. Injectable callbacks
+# let tests exercise long durations and slow terminals without waiting in real time.
+function _countdown(t::Time; now_ns=time_ns, wait=sleep,
+                    render=t -> println(clock(t)), clear=clearlines)
+    duration_ns = Dates.value(t)
+    start = now_ns()
+    try
+        while true
+            elapsed = now_ns() - start
+            remaining = max(Int128(duration_ns) - Int128(elapsed), 0)
+            seconds = cld(remaining, 1_000_000_000)
+            shown = Time(0) + Second(seconds)
+            render(shown)
+            remaining == 0 && break
+
+            # Wake at the next display boundary, accounting for rendering time.
+            boundary = duration_ns - (seconds - 1) * 1_000_000_000
+            delay = max(Int128(boundary) - Int128(now_ns() - start), 0)
+            delay > 0 && wait(Float64(delay) / 1e9)
+            clear(length(split(clock(shown), "\n")))
         end
+    catch e
+        e isa InterruptException || rethrow()
     end
+    return nothing
 end
+
+countdown(t::Time) = _countdown(t)
 
 function stopwatch(duration=0.1::AbstractFloat)
     start = Dates.now()
