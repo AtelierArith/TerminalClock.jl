@@ -130,3 +130,6 @@ julia> print(clock(dt))
 
 - [Julia Discourse](https://discourse.julialang.org/t/ann-terminalclock-jl/71650)
 - [Zenn.dev (web post written in Japanese)](https://zenn.dev/terasakisatoshi/articles/4416c268ed966c)
+To measure a real ten-minute countdown (with output sent to the null device), run
+`julia --project test/countdown_accuracy.jl`. Normal unit tests simulate timing
+delays without waiting ten minutes.
