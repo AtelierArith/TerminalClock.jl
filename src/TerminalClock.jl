@@ -170,7 +170,7 @@ function _stopwatch(duration::AbstractFloat; now_ns=time_ns, wait=sleep,
     try
         while true
             elapsed = now_ns() - start
-            t = _elapsed_time(elapsed)
+            t = _elapsed_time(elapsed)::Time
             render(t)
             wait(duration)
             clear(length(split(stopwatch(t), "\n")))
