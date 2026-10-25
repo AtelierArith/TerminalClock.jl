@@ -140,3 +140,18 @@ delays without waiting ten minutes.
 To compare stopwatch frames with real elapsed time for one minute, run
 `julia --project test/stopwatch_accuracy.jl`. This measures frame generation;
 terminal emulator output latency is additional.
+
+To test the public APIs in a background Julia REPL, including pseudo-terminal
+output, run these optional Linux/macOS tests:
+
+```console
+julia --project test/repl_accuracy.jl stopwatch 60
+julia --project test/repl_accuracy.jl countdown 600
+```
+
+The script decodes the displayed digits and compares frame receipt times using a
+monotonic clock. It reports final drift, frame stalls, and the age of the previous
+stopwatch frame before each update. Measurements start at the first received
+frame and exclude REPL startup. These tests require the default ASCII dials and
+do not measure a GUI terminal emulator's display latency. CI runs two-second
+smoke tests on Linux and macOS; Windows runs the unit, Aqua, and JET tests.

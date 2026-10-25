@@ -37,6 +37,11 @@ jobs:
       - uses: julia-actions/cache@v3
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
+      - name: REPL pseudo-terminal smoke tests
+        if: runner.os != 'Windows'
+        run: |
+          julia --project test/repl_accuracy.jl stopwatch 2
+          julia --project test/repl_accuracy.jl countdown 2
   docs:
     permissions:
       contents: write
