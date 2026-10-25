@@ -167,7 +167,7 @@ function _stopwatch(duration::AbstractFloat; now_ns=time_ns, wait=sleep,
     isfinite(duration) && duration > 0 ||
         throw(ArgumentError("refresh interval must be finite and positive"))
     height = length(split(stopwatch(Time(0)), "\n"))
-    interval = max(Float64(duration), 1e-9)
+    interval_ns = max(round(Int128, duration * 1e9), 1)
     start = now_ns()
     try
         while true
@@ -176,10 +176,9 @@ function _stopwatch(duration::AbstractFloat; now_ns=time_ns, wait=sleep,
             render(t)
             # Schedule from the origin, so rendering and clearing do not add
             # to every refresh interval. Missed deadlines trigger a fresh frame.
-            elapsed_seconds = Float64(elapsed) / 1e9
-            deadline = (floor(elapsed_seconds / interval) + 1) * interval
-            delay = deadline - Float64(now_ns() - start) / 1e9
-            delay > 0 && wait(delay)
+            deadline = (fld(Int128(elapsed), interval_ns) + 1) * interval_ns
+            delay = deadline - Int128(now_ns() - start)
+            delay > 0 && wait(Float64(delay) / 1e9)
             clear(height)
         end
     catch e
