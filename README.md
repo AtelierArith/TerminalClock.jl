@@ -37,6 +37,9 @@ julia> using TerminalClock; clock() # Press Ctrl+C to quit
 
 ## `stopwatch()`
 
+Elapsed time uses a monotonic clock. The default refresh interval is 0.1 seconds;
+the visible frame stays unchanged between refreshes.
+
 - On your mark, get set, go! 
 
 ```julia
@@ -133,3 +136,7 @@ julia> print(clock(dt))
 To measure a real ten-minute countdown (with output sent to the null device), run
 `julia --project test/countdown_accuracy.jl`. Normal unit tests simulate timing
 delays without waiting ten minutes.
+
+To compare stopwatch frames with real elapsed time for one minute, run
+`julia --project test/stopwatch_accuracy.jl`. This measures frame generation;
+terminal emulator output latency is additional.

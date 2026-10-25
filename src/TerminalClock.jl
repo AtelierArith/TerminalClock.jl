@@ -159,25 +159,26 @@ end
 
 countdown(t::Time) = _countdown(t)
 
-function stopwatch(duration=0.1::AbstractFloat)
-    start = Dates.now()
-    sleep(0.001) # warmup
-    while true
-        try
-            Δ = Dates.now() - start # millisecond
-            periods =
-                Dates.canonicalize(Dates.CompoundPeriod(Dates.Millisecond(Δ))).periods
-            str = stopwatch(Time(periods...))
-            println(str)
-            sleep(duration)
-            H = length(split(str, "\n"))
-            clearlines(H)
-        catch e
-            isa(e, InterruptException) || error(e)
-            break
+function _stopwatch(duration::AbstractFloat; now_ns=time_ns, wait=sleep,
+                    render=t -> println(stopwatch(t)), clear=clearlines)
+    isfinite(duration) && duration > 0 ||
+        throw(ArgumentError("refresh interval must be finite and positive"))
+    start = now_ns()
+    try
+        while true
+            elapsed = now_ns() - start
+            t = Time(0) + Nanosecond(Int64(elapsed % UInt64(86_400_000_000_000)))
+            render(t)
+            wait(duration)
+            clear(length(split(stopwatch(t), "\n")))
         end
+    catch e
+        e isa InterruptException || rethrow()
     end
+    return nothing
 end
+
+stopwatch(duration::AbstractFloat=0.1) = _stopwatch(duration)
 
 function clock()
     while true
