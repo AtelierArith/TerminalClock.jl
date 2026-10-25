@@ -34,4 +34,5 @@ function Base.hcat(dl::Dial, dr::Dial)
     buf |> take! |> String |> Dial
 end
 
-Base.hcat(ds::Dial...) = reduce(hcat, ds)
+Base.hcat(d::Dial) = d
+Base.hcat(d::Dial, ds::Dial...) = foldl(hcat, ds; init=d)

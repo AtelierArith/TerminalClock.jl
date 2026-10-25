@@ -48,7 +48,7 @@ function n2d(dials::Dials, n::Int)
     n == 7 && return Dial(getfield(dials, :seven))
     n == 8 && return Dial(getfield(dials, :eight))
     n == 9 && return Dial(getfield(dials, :nine))
-    DomainError("n should satisfy 0≤ n ≤9, actual $n")
+    throw(DomainError(n, "n should satisfy 0≤ n ≤9"))
 end
 
 n2d(n::Int, s::Symbol) = n2d(n, Val(s)) # symbol dispatcher
@@ -65,9 +65,8 @@ function clearline(; move_up::Bool=false)
 end
 
 function clearlines(H::Integer)
-    for _ in 1:H
-        clearline(move_up=true)
-    end
+    # Send cursor movement in one write rather than one write per line.
+    print(repeat("\x1b[2K\x1b[999D\x1b[1A", H))
 end
 
 clock(dt::DateTime) = clock(Time(dt))
@@ -130,44 +129,65 @@ function countdown(;
     countdown(setup_timer(; hour, minute, second))
 end
 
-function countdown(t::Time)
-    while true
-        try
-            str = clock(t)
-            println(str)
-            sleep(1)
-            if Dates.hour(t) == Dates.minute(t) == Dates.second(t) == 0
-                break
-            end
-            t -= Second(1)
-            H = length(split(str, "\n"))
-            clearlines(H)
-        catch e
-            isa(e, InterruptException) || error(e)
-            break
+# Keep time independently of rendering and scheduler delays. Injectable callbacks
+# let tests exercise long durations and slow terminals without waiting in real time.
+function _countdown(t::Time; now_ns=time_ns, wait=sleep,
+                    render=t -> println(clock(t)), clear=clearlines)
+    duration_ns = Dates.value(t)
+    height = length(split(clock(t), "\n"))
+    start = now_ns()
+    try
+        while true
+            elapsed = now_ns() - start
+            remaining = max(Int128(duration_ns) - Int128(elapsed), 0)
+            seconds = cld(remaining, 1_000_000_000)
+            shown = Time(0) + Second(seconds)
+            render(shown)
+            remaining == 0 && break
+
+            # Wake at the next display boundary, accounting for rendering time.
+            boundary = duration_ns - (seconds - 1) * 1_000_000_000
+            delay = max(Int128(boundary) - Int128(now_ns() - start), 0)
+            delay > 0 && wait(Float64(delay) / 1e9)
+            clear(height)
         end
+    catch e
+        e isa InterruptException || rethrow()
     end
+    return nothing
 end
 
-function stopwatch(duration=0.1::AbstractFloat)
-    start = Dates.now()
-    sleep(0.001) # warmup
-    while true
-        try
-            Δ = Dates.now() - start # millisecond
-            periods =
-                Dates.canonicalize(Dates.CompoundPeriod(Dates.Millisecond(Δ))).periods
-            str = stopwatch(Time(periods...))
-            println(str)
-            sleep(duration)
-            H = length(split(str, "\n"))
-            clearlines(H)
-        catch e
-            isa(e, InterruptException) || error(e)
-            break
+countdown(t::Time) = _countdown(t)
+
+_elapsed_time(ns::Unsigned) =
+    Time(0) + Nanosecond(Int64(ns % UInt64(86_400_000_000_000)))
+
+function _stopwatch(duration::AbstractFloat; now_ns=time_ns, wait=sleep,
+                    render=t -> println(stopwatch(t)), clear=clearlines)
+    isfinite(duration) && duration > 0 ||
+        throw(ArgumentError("refresh interval must be finite and positive"))
+    height = length(split(stopwatch(Time(0)), "\n"))
+    interval_ns = max(round(Int128, duration * 1e9), 1)
+    start = now_ns()
+    try
+        while true
+            elapsed = now_ns() - start
+            t = _elapsed_time(elapsed)::Time
+            render(t)
+            # Schedule from the origin, so rendering and clearing do not add
+            # to every refresh interval. Missed deadlines trigger a fresh frame.
+            deadline = (fld(Int128(elapsed), interval_ns) + 1) * interval_ns
+            delay = deadline - Int128(now_ns() - start)
+            delay > 0 && wait(Float64(delay) / 1e9)
+            clear(height)
         end
+    catch e
+        e isa InterruptException || rethrow()
     end
+    return nothing
 end
+
+stopwatch(duration::AbstractFloat=0.01) = _stopwatch(duration)
 
 function clock()
     while true
