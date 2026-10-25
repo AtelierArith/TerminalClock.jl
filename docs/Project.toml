@@ -3,7 +3,7 @@ Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 TerminalClock = "65687e93-20ea-45b9-bbc3-ed39219e1d43"
 
 [sources]
-TerminalClock = {path = "/home/terasaki/work/atelierarith/TerminalClock.jl"}
+TerminalClock = {path = ".."}
 
 [compat]
 Documenter = "1"
