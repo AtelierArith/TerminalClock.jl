@@ -13,7 +13,18 @@ function open_pseudoterminal()
         (Ref{Cint}, Ref{Cint}, Ptr{Cvoid}, Ptr{Cvoid}, Ptr{Cvoid}),
         master_fd, slave_fd, C_NULL, C_NULL, C_NULL)
     status == 0 || error("openpty failed: ", Base.Libc.errno())
-    return Base.TTY(RawFD(master_fd[])), Base.TTY(RawFD(slave_fd[]))
+    # Keep the master as a raw FD: wrapping it as a libuv TTY can block on
+    # macOS. Only the child uses the terminal slave as stdin/stdout.
+    ccall(:fcntl, Cint, (Cint, Cint, Cint), master_fd[], 2, 1) == 0 ||
+        error("fcntl(FD_CLOEXEC) failed")
+    return master_fd[], Base.fdio(slave_fd[], true)
+end
+
+# POSIX pollfd layout, shared by Linux and macOS.
+struct PollFD
+    fd::Cint
+    events::Cshort
+    revents::Cshort
 end
 
 function digit_maps()
@@ -62,50 +73,78 @@ function test_repl_accuracy(mode="stopwatch",
     master, slave = open_pseudoterminal()
     process = run(pipeline(cmd; stdin=slave, stdout=slave, stderr=slave); wait=false)
     close(slave)
-    timed_out = Ref(false)
-    watchdog = Timer(seconds + 120) do _
-        timed_out[] = true
-        process_running(process) && kill(process)
-        close(master)
-    end
+    timed_out = false
+    deadline = time_ns() + UInt64(seconds + 120) * 1_000_000_000
     samples = Tuple{UInt64,Float64}[]
     rows = Vector{Char}[]
     transcript = IOBuffer()
+    pending = UInt8[]
+    buffer = Vector{UInt8}(undef, 65536)
+    sent = false
+    command = mode == "stopwatch" ? "stopwatch()" :
+              "countdown(Time(0) + Second($seconds))"
+    input = Vector{UInt8}("using TerminalClock, Dates; $command\n")
     try
-        # Wait until REPL terminal initialization is complete. Sending input
-        # earlier can lose it when the child switches terminal modes on CI.
-        write(transcript, readuntil(master, "julia> "))
-        command = mode == "stopwatch" ? "stopwatch()" :
-                  "countdown(Time(0) + Second($seconds))"
-        # Send input to an actual interactive REPL, rather than using julia -e.
-        println(master, "using TerminalClock, Dates; $command")
-        flush(master)
-        while !eof(master)
-            line = readline(master)
-            received = time_ns()
-            position(transcript) < 8192 && println(transcript, line)
-            clean = replace(line, r"\x1b\[[0-?]*[ -/]*[@-~]" => "", "\r" => "")
-            chars = collect(clean)
-            length(chars) == width || continue
-            push!(rows, chars)
-            length(rows) == 9 || continue
-            shown = decode_frame(rows, mode, maps)
-            empty!(rows)
-            isnothing(shown) && continue
-            push!(samples, (received, Float64(shown)))
-            if mode == "stopwatch" ? shown >= seconds : shown == 0
+        finished = false
+        while !finished
+            if time_ns() >= deadline
+                timed_out = true
                 break
+            end
+            event = Ref(PollFD(master, 1, 0))
+            # poll has a bounded timeout, so a stalled REPL cannot block cleanup.
+            ready = if Sys.isapple()
+                ccall(:poll, Cint, (Ref{PollFD}, Cuint, Cint), event, 1, 20)
+            else
+                ccall(:poll, Cint, (Ref{PollFD}, Culong, Cint), event, 1, 20)
+            end
+            ready < 0 && error("poll failed: ", Base.Libc.errno())
+            ready == 0 && continue
+            event[].revents & 1 == 0 && break
+            n = ccall(:read, Cssize_t, (Cint, Ptr{UInt8}, Csize_t),
+                      master, buffer, length(buffer))
+            received = time_ns()
+            n <= 0 && break
+            append!(pending, @view buffer[1:n])
+            if !sent
+                occursin("julia> ", String(copy(pending))) || continue
+                # Wait for terminal initialization before sending REPL input.
+                written = ccall(:write, Cssize_t, (Cint, Ptr{UInt8}, Csize_t),
+                                master, input, length(input))
+                written == length(input) || error("Incomplete REPL input write")
+                empty!(pending)
+                sent = true
+                continue
+            end
+            while true
+                newline = findfirst(==(0x0a), pending)
+                isnothing(newline) && break
+                line = String(pending[1:newline-1])
+                deleteat!(pending, 1:newline)
+                position(transcript) < 8192 && println(transcript, line)
+                clean = replace(line, r"\x1b\[[0-?]*[ -/]*[@-~]" => "", "\r" => "")
+                chars = collect(clean)
+                length(chars) == width || continue
+                push!(rows, chars)
+                length(rows) == 9 || continue
+                shown = decode_frame(rows, mode, maps)
+                empty!(rows)
+                isnothing(shown) && continue
+                push!(samples, (received, Float64(shown)))
+                if mode == "stopwatch" ? shown >= seconds : shown == 0
+                    finished = true
+                    break
+                end
             end
         end
     finally
-        close(watchdog)
-        process_running(process) && kill(process)
+        process_running(process) && kill(process, Base.SIGKILL)
         wait(process)
-        isopen(master) && close(master)
+        ccall(:close, Cint, (Cint,), master)
     end
-    @test !timed_out[]
+    @test !timed_out
     @test length(samples) > 1
-    if timed_out[] || length(samples) <= 1
+    if timed_out || length(samples) <= 1
         println("REPL transcript (first 8 KiB):\n", String(take!(transcript)))
         return nothing
     end
