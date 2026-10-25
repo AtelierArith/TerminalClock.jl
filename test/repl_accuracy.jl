@@ -58,6 +58,7 @@ function test_repl_accuracy(mode="stopwatch",
     width = mode == "stopwatch" ? 73 : 79
     project = dirname(@__DIR__)
     cmd = `$(Base.julia_cmd()) --project=$project --interactive --banner=no --startup-file=no --history-file=no --color=no`
+    cmd = addenv(cmd, "TERM" => "xterm-256color")
     master, slave = open_pseudoterminal()
     process = run(pipeline(cmd; stdin=slave, stdout=slave, stderr=slave); wait=false)
     close(slave)
@@ -69,7 +70,11 @@ function test_repl_accuracy(mode="stopwatch",
     end
     samples = Tuple{UInt64,Float64}[]
     rows = Vector{Char}[]
+    transcript = IOBuffer()
     try
+        # Wait until REPL terminal initialization is complete. Sending input
+        # earlier can lose it when the child switches terminal modes on CI.
+        write(transcript, readuntil(master, "julia> "))
         command = mode == "stopwatch" ? "stopwatch()" :
                   "countdown(Time(0) + Second($seconds))"
         # Send input to an actual interactive REPL, rather than using julia -e.
@@ -78,6 +83,7 @@ function test_repl_accuracy(mode="stopwatch",
         while !eof(master)
             line = readline(master)
             received = time_ns()
+            position(transcript) < 8192 && println(transcript, line)
             clean = replace(line, r"\x1b\[[0-?]*[ -/]*[@-~]" => "", "\r" => "")
             chars = collect(clean)
             length(chars) == width || continue
@@ -99,6 +105,10 @@ function test_repl_accuracy(mode="stopwatch",
     end
     @test !timed_out[]
     @test length(samples) > 1
+    if timed_out[] || length(samples) <= 1
+        println("REPL transcript (first 8 KiB):\n", String(take!(transcript)))
+        return nothing
+    end
     elapsed = Float64(samples[end][1] - samples[1][1]) / 1e9
     if mode == "countdown"
         @test samples[1][2] == seconds
