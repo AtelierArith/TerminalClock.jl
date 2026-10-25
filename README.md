@@ -37,7 +37,7 @@ julia> using TerminalClock; clock() # Press Ctrl+C to quit
 
 ## `stopwatch()`
 
-Elapsed time uses a monotonic clock. The default refresh interval is 0.1 seconds;
+Elapsed time uses a monotonic clock. The default refresh interval is 0.01 seconds;
 the visible frame stays unchanged between refreshes.
 
 - On your mark, get set, go! 

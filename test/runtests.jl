@@ -206,12 +206,12 @@ include("verification.jl")
         render=t -> begin
             push!(shown, t)
             ticks[] += 20_000_000 # rendering delay must count as elapsed time
-            length(shown) == 501 && throw(InterruptException())
+            length(shown) == 601 && throw(InterruptException())
         end,
         clear=_ -> nothing)
     @test first(shown) == Time(0)
     @test last(shown) == Time(0, 1)
-    @test shown[2] == Time(0, 0, 0, 120)
+    @test shown[2] == Time(0, 0, 0, 100)
     for duration in (0.0, -0.1, Inf, NaN)
         @test_throws ArgumentError stopwatch(duration)
     end

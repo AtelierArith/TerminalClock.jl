@@ -65,9 +65,8 @@ function clearline(; move_up::Bool=false)
 end
 
 function clearlines(H::Integer)
-    for _ in 1:H
-        clearline(move_up=true)
-    end
+    # Send cursor movement in one write rather than one write per line.
+    print(repeat("\x1b[2K\x1b[999D\x1b[1A", H))
 end
 
 clock(dt::DateTime) = clock(Time(dt))
@@ -135,6 +134,7 @@ end
 function _countdown(t::Time; now_ns=time_ns, wait=sleep,
                     render=t -> println(clock(t)), clear=clearlines)
     duration_ns = Dates.value(t)
+    height = length(split(clock(t), "\n"))
     start = now_ns()
     try
         while true
@@ -149,7 +149,7 @@ function _countdown(t::Time; now_ns=time_ns, wait=sleep,
             boundary = duration_ns - (seconds - 1) * 1_000_000_000
             delay = max(Int128(boundary) - Int128(now_ns() - start), 0)
             delay > 0 && wait(Float64(delay) / 1e9)
-            clear(length(split(clock(shown), "\n")))
+            clear(height)
         end
     catch e
         e isa InterruptException || rethrow()
@@ -166,14 +166,21 @@ function _stopwatch(duration::AbstractFloat; now_ns=time_ns, wait=sleep,
                     render=t -> println(stopwatch(t)), clear=clearlines)
     isfinite(duration) && duration > 0 ||
         throw(ArgumentError("refresh interval must be finite and positive"))
+    height = length(split(stopwatch(Time(0)), "\n"))
+    interval = max(Float64(duration), 1e-9)
     start = now_ns()
     try
         while true
             elapsed = now_ns() - start
             t = _elapsed_time(elapsed)::Time
             render(t)
-            wait(duration)
-            clear(length(split(stopwatch(t), "\n")))
+            # Schedule from the origin, so rendering and clearing do not add
+            # to every refresh interval. Missed deadlines trigger a fresh frame.
+            elapsed_seconds = Float64(elapsed) / 1e9
+            deadline = (floor(elapsed_seconds / interval) + 1) * interval
+            delay = deadline - Float64(now_ns() - start) / 1e9
+            delay > 0 && wait(delay)
+            clear(height)
         end
     catch e
         e isa InterruptException || rethrow()
@@ -181,7 +188,7 @@ function _stopwatch(duration::AbstractFloat; now_ns=time_ns, wait=sleep,
     return nothing
 end
 
-stopwatch(duration::AbstractFloat=0.1) = _stopwatch(duration)
+stopwatch(duration::AbstractFloat=0.01) = _stopwatch(duration)
 
 function clock()
     while true

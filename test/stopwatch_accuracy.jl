@@ -10,7 +10,7 @@ function measured_now()
     origin[] == 0 && (origin[] = tick)
     return tick
 end
-TerminalClock._stopwatch(0.1;
+TerminalClock._stopwatch(0.01;
     now_ns=measured_now,
     render=t -> begin
         # Exercise the actual dial formatter and measure when the frame is ready.
