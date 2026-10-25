@@ -17,9 +17,12 @@ end
     JET.@test_call setup_timer(minute=10)
     # JET analyzes Float64 rather than its value; interval validation can throw
     # for NaN/nonpositive values, covered separately by runtime tests.
-    JET.@test_call ignore_throws=true TerminalClock._stopwatch(0.1;
+    verify_stopwatch = interval -> TerminalClock._stopwatch(interval;
         now_ns=() -> UInt64(0), wait=_ -> nothing,
         render=_ -> nothing, clear=_ -> nothing)
+    # JET 0.9 on Julia 1.10 predates the ignore_throws option.
+    options = Base.pkgversion(JET) >= v"0.12" ? (; ignore_throws=true) : (;)
+    JET.test_call(verify_stopwatch, (Float64,); options...)
     JET.@test_call TerminalClock._countdown(Time(0, 10);
         now_ns=() -> UInt64(0), wait=_ -> nothing,
         render=_ -> nothing, clear=_ -> nothing)
