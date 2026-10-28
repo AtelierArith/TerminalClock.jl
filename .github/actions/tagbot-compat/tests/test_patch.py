@@ -2,6 +2,7 @@ import ast
 import os
 from pathlib import Path
 import sys
+import time
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock
@@ -35,6 +36,16 @@ class CompatibilityTests(unittest.TestCase):
         scope = {"GithubException": GithubException, "Abort": Abort, "logger": Mock()}
         exec(compile(module, "patched_create_release.py", "exec"), scope)
         cls.create_release = staticmethod(scope["create_release"])
+        method = next(node for node in repo.body if isinstance(node, ast.FunctionDef) and node.name == "_filter_map_versions")
+        scope = {"Dict": dict, "logger": Mock()}
+        exec(compile(ast.Module(body=[method], type_ignores=[]), "patched_filter.py", "exec"), scope)
+        cls.filter_versions = staticmethod(scope["_filter_map_versions"])
+        method = next(node for node in repo.body if isinstance(node, ast.FunctionDef) and node.name == "new_versions")
+        scope = {"Dict": dict, "logger": Mock(), "time": time,
+                 "VersionInfo": SimpleNamespace(parse=lambda v: tuple(map(int, v.split(".")))),
+                 "_metrics": SimpleNamespace(versions_checked=0)}
+        exec(compile(ast.Module(body=[method], type_ignores=[]), "upstream_new_versions.py", "exec"), scope)
+        cls.new_versions = staticmethod(scope["new_versions"])
 
     def fake_repo(self, draft=False):
         repo = Mock()
@@ -163,6 +174,68 @@ class CompatibilityTests(unittest.TestCase):
             patch_source(self.source + b"\n")
         with self.assertRaises(RuntimeError):
             patch_source(patch_source(self.source))
+
+
+
+
+class SelectionTests(unittest.TestCase):
+    setUpClass = classmethod(CompatibilityTests.setUpClass.__func__)
+    fake_repo = CompatibilityTests.fake_repo
+    def selection_repo(self):
+        repo = self.fake_repo()
+        repo._build_tags_cache.return_value = {"v0.4.2": "tag"}
+        repo._get_version_tag.side_effect = lambda v: v
+        repo._commit_sha_of_tree.return_value = "registered"
+        return repo
+
+    def test_missing_release_reaches_verified_release_pipeline(self):
+        repo = self.selection_repo()
+        repo._versions.return_value = {"0.4.2": "tree"}
+        repo._filter_map_versions.side_effect = lambda versions: self.filter_versions(repo, versions)
+        pending = self.new_versions(repo)
+        self.assertEqual(pending, {"v0.4.2": "registered"})
+        for version, sha in pending.items():
+            self.create_release(repo, version, sha)
+        self.assertNotIn("target_commitish", repo._repo.create_git_release.call_args.kwargs)
+        repo._repo.get_git_ref.assert_called_once_with("tags/v0.4.2")
+
+    def test_existing_release_is_not_selected(self):
+        repo = self.selection_repo()
+        repo._repo.get_releases.return_value = [SimpleNamespace(tag_name="v0.4.2")]
+        self.assertEqual(self.filter_versions(repo, {"0.4.2": "tree"}), {})
+        repo._commit_sha_of_tree.assert_not_called()
+
+    def test_unrequested_historical_tags_remain_skipped(self):
+        repo = self.selection_repo()
+        repo._build_tags_cache.return_value = {"v0.1.0": "tag", "v0.4.1": "tag"}
+        self.assertEqual(self.filter_versions(repo, {"0.1.0": "a", "0.4.1": "b"}), {})
+        repo._repo.get_releases.assert_not_called()
+
+    def test_new_versions_keep_upstream_selection(self):
+        repo = self.selection_repo()
+        self.assertEqual(self.filter_versions(repo, {"0.4.3": "tree"}), {"v0.4.3": "registered"})
+
+    def test_unknown_registry_commit_does_not_release(self):
+        repo = self.selection_repo()
+        repo._commit_sha_of_tree.return_value = None
+        repo._commit_sha_from_registry_pr.return_value = None
+        self.assertEqual(self.filter_versions(repo, {"0.4.2": "tree"}), {})
+
+    def test_release_listing_failure_fails_closed(self):
+        repo = self.selection_repo()
+        repo._repo.get_releases.side_effect = GithubException("denied", 403)
+        with self.assertRaises(GithubException):
+            self.filter_versions(repo, {"0.4.2": "tree"})
+        repo._repo.create_git_release.assert_not_called()
+
+    def test_pipeline_rejects_mismatched_registered_commit(self):
+        repo = self.selection_repo()
+        repo._repo.get_git_ref.return_value.object.sha = "wrong"
+        pending = self.filter_versions(repo, {"0.4.2": "tree"})
+        with self.assertRaises(Abort):
+            for version, sha in pending.items():
+                self.create_release(repo, version, sha)
+        repo._repo.create_git_release.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -6,6 +6,16 @@ The official TagBot 1.25.15 image is pinned by digest. Its normal input defaults
 
 This needs no new token or repository permissions. It is nevertheless a custom, locally maintained TagBot patch, not an upstream supported configuration. Upstream upgrades require reviewing and regenerating the source hash and patch; they cannot silently apply.
 
+## Existing-tag recovery
+
+Upstream skips all existing tags before attempting a Release. The compatibility
+selector retries only the specifically requested `v0.4.2` when its GitHub Release
+is absent. It resolves the registered tree to a commit normally; the later
+tag/commit check still gates publication. Other historical tags are not
+backfilled, existing Releases are skipped, and new-version selection is unchanged.
+A Release-listing error stops recovery rather than guessing. Remove this
+version-specific recovery clause after the release has been verified.
+
 ## Tests and maintenance
 
 The read-only TagBot compatibility CI compiles and exercises the patched upstream method, builds the actual pinned container, imports its patched module, and verifies the inherited command. Integration release behavior is verified separately by running TagBot after merge.
