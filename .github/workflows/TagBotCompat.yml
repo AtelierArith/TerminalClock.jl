@@ -1,0 +1,28 @@
+name: TagBot compatibility
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Test pinned upstream patch
+        env:
+          TAGBOT_UPSTREAM_SOURCE: /tmp/tagbot-repo.py
+        run: |
+          curl --fail --silent --show-error --location \
+            https://raw.githubusercontent.com/JuliaRegistries/TagBot/87cc4cc2b4639f6c743f5772f376a32914060732/tagbot/action/repo.py \
+            --output "$TAGBOT_UPSTREAM_SOURCE"
+          python -m unittest discover -v -s .github/actions/tagbot-compat/tests
+      - name: Build actual TagBot container
+        run: docker build --tag tagbot-compat:test .github/actions/tagbot-compat
+      - name: Verify module import and inherited command
+        run: |
+          test "$(docker inspect --format '{{json .Config.Cmd}}' tagbot-compat:test)" = '["python","-m","tagbot.action"]'
+          docker run --rm --entrypoint python tagbot-compat:test -c 'import inspect; from tagbot.action.repo import Repo; source = inspect.getsource(Repo.create_release); assert "Release tag does not match the registered commit" in source; assert "if self._draft else {}" in source'
