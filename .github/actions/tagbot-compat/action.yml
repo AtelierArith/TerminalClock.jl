@@ -1,0 +1,128 @@
+name: Julia TagBot (existing-tag compatibility)
+author: Chris de Graaf
+description: Creates GitHub releases for your registered Julia packages
+inputs:
+  token:
+    description: GitHub API token
+    required: true
+  registry:
+    description: Owner/name of the registry repository
+    required: false
+    default: JuliaRegistries/General
+  github:
+    description: URL of self-hosted GitHub
+    required: false
+    default: github.com
+  github_api:
+    description: API base URL of self-hosted GitHub
+    required: false
+    default: api.github.com
+  branches:
+    description: Whether or not to merge release branches
+    required: false
+    default: false
+  dispatch:
+    description: Whether or not to create a repository dispatch event prior to making releases
+    required: false
+    default: false
+  dispatch_delay:
+    description: Number of minutes to wait after creating a repository dispatch event
+    required: false
+    default: 5
+  lookback:
+    description: "[DEPRECATED] This parameter no longer has any effect and will be removed in a future version"
+    required: false
+    default: 3
+  ssh:
+    description: SSH private key for pushing tags
+    required: false
+  ssh_password:
+    description: Password for the SSH key
+    required: false
+  gpg:
+    description: GPG key for signing tags
+    required: false
+  gpg_password:
+    description: Password for the GPG key
+    required: false
+  registry_token:
+    description: GitHub API token for accessing the registry (defaults to the main token)
+    required: false
+  registry_ssh:
+    description: SSH private key for accessing a private registry
+    required: false
+  draft:
+    description: Create draft releases
+    required: false
+    default: false
+  user:
+    description: Git username
+    required: false
+    default: github-actions[bot]
+  email:
+    description: Git email
+    required: false
+    default: 41898282+github-actions[bot]@users.noreply.github.com
+  branch:
+    description: Branch to create releases against when possible
+    required: false
+  subdir:
+    description: Subdirectory of package in repo, if not at top level
+    required: false
+  tag_prefix:
+    description: Tag prefix (leave empty for automatic determination or set to `NO_PREFIX` to disable)
+    required: false
+  changelog:
+    description: Changelog template
+    required: false
+    default: |
+      ## {{ package }} {{ version }}
+      {% if yanked %}
+
+      :warning: **This release has been yanked from the registry.**
+      {% endif -%}
+      {% if previous_release %}
+
+      [Diff since {{ previous_release }}]({{ compare_url }})
+      {% endif %}
+
+      {% if custom %}
+      {{ custom }}
+      {% endif %}
+
+      {% if backport %}
+      This release has been identified as a backport.
+      Automated changelogs for backports tend to be wildly incorrect.
+      Therefore, the list of issues and pull requests is hidden.
+      <!--
+      {% endif %}
+      {% if pulls %}
+      **Merged pull requests:**
+      {% for pull in pulls %}
+      - {{ pull.title }} (#{{ pull.number }}) (@{{ pull.author.username }})
+      {% endfor %}
+      {% endif %}
+
+      {% if issues %}
+      **Closed issues:**
+      {% for issue in issues %}
+      - {{ issue.title }} (#{{ issue.number }})
+      {% endfor %}
+      {% endif %}
+
+      {% if backport %}
+      -->
+      {% endif %}
+  changelog_ignore:
+    description: Labels for issues and pull requests to be ignored (comma-delimited)
+    required: false
+  changelog_format:
+    description: "Changelog format: custom (default), github (auto-generated), or conventional (conventional commits)"
+    required: false
+    default: custom
+runs:
+  using: docker
+  image: Dockerfile
+branding:
+  icon: tag
+  color: red
