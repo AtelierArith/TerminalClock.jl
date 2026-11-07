@@ -12,8 +12,8 @@ for a pane or window of their own; anything else on that screen is erased. The
 last frame stays on screen when you exit with Ctrl+C or the countdown ends. The bundled ASCII-style dials also use a Unicode
 colon symbol, so UTF-8 support is useful.
 
-Give the default clock/countdown at least **79 columns and 9 rows**; the default
-stopwatch uses **73 columns and 9 rows**. Small panes are fine:
+Give the default clock/countdown at least **79 columns and 10 rows** (the dial height plus one); the default
+stopwatch uses **73 columns and 10 rows**. Small panes are fine:
 each refresh checks the terminal size and picks the first candidate dial that
 fits (the default dial, then the Keycap dial, then plain text such as
 `12:34:56`), so shrinking or enlarging the pane switches dials automatically.

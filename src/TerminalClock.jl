@@ -20,10 +20,11 @@ Use an absolute path and restart Julia to load the new dials. The file must
 contain a complete `[Large]` table; `[Small]` is optional.
 
 The file is loaded on the next import, so an invalid path or TOML file can
-prevent `using TerminalClock`. See [Custom dials](@ref custom-dials).
+prevent `using TerminalClock`. This also removes any saved list of candidate
+dials: the most recent `set_dials` call wins. See [Custom dials](@ref custom-dials).
 """
 function set_dials(tomlfile::AbstractString)
-    @set_preferences!("tomlfile" => tomlfile)
+    @set_preferences!("tomlfile" => tomlfile, "tomlfiles" => nothing)
     @info("New dials set; restart your Julia session for this change to take effect!")
 end
 
@@ -33,10 +34,11 @@ end
 Save several TOML dial files as candidates, in order. From the first, the
 first dial that fits the terminal is used. The bundled `Keycap.toml` and
 `Text.toml` dials follow the registered ones. Use absolute paths and restart
-Julia to load the new dials.
+Julia to load the new dials. This also removes any saved single dial file: the
+most recent `set_dials` call wins.
 """
 function set_dials(tomlfiles::AbstractVector{<:AbstractString})
-    @set_preferences!("tomlfiles" => String[tomlfiles...])
+    @set_preferences!("tomlfiles" => String[tomlfiles...], "tomlfile" => nothing)
     @info("New dials set; restart your Julia session for this change to take effect!")
 end
 
@@ -130,6 +132,15 @@ const CLEAR_SCREEN = "\e[H\e[2J"
 _live_frame(fonts, frame, termsize::Tuple{Int,Int})::String =
     frame(select_font(fonts, frame, termsize))
 
+# Default live renderer: clear and frame go out in one write, so a redraw cannot
+# be seen (or interrupted) half done, and the frame has no trailing newline so
+# a one-row pane does not scroll it away.
+_live_render(io::IO, fonts, frame, termsize) =
+    t -> print(io, CLEAR_SCREEN * _live_frame(fonts, f -> frame(f, t), termsize()))
+
+# Leave the cursor on a fresh line below the last frame (default renderer only).
+_live_finish(io::IO, render) = (render === nothing && println(io); nothing)
+
 """
     clock()
     clock(t::Dates.Time) -> String
@@ -140,7 +151,7 @@ The live display refreshes approximately every 0.5 seconds.
 
 The live display clears the whole screen on every refresh, so run it in a pane
 of its own. If the terminal is too small for the dial, it switches to the next
-smaller candidate (down to plain text) automatically. The last frame stays on
+candidate (down to plain text) automatically. The last frame stays on
 screen after exit.
 
 Passing a `Time` or `DateTime` instead returns one dial frame without printing
@@ -237,7 +248,7 @@ There is no extra sleep after zero. Press Ctrl+C to stop early.
 
 The live display clears the whole screen on every refresh, so run it in a pane
 of its own. If the terminal is too small for the dial, it switches to the next
-smaller candidate (down to plain text) automatically. The last frame stays on
+candidate (down to plain text) automatically. The last frame stays on
 screen after exit.
 
 # Examples
@@ -262,9 +273,9 @@ end
 # let tests exercise long durations and slow terminals without waiting in real time.
 function _countdown(t::Time; now_ns=time_ns, wait=sleep, io::IO=stdout,
                     fonts=FONTS, termsize=() -> displaysize(io),
-                    clear=() -> print(io, CLEAR_SCREEN),
-                    render=t -> println(io, _live_frame(
-                        fonts, f -> clock_frame(f, t), termsize())))
+                    clear=() -> nothing, render=nothing)
+    draw = render === nothing ?
+           _live_render(io, fonts, clock_frame, termsize) : render
     duration_ns = Dates.value(t)
     start = now_ns()
     try
@@ -274,7 +285,7 @@ function _countdown(t::Time; now_ns=time_ns, wait=sleep, io::IO=stdout,
             seconds = cld(remaining, 1_000_000_000)
             shown = Time(0) + Second(seconds)
             clear()
-            render(shown)
+            draw(shown)
             remaining == 0 && break
 
             # Wake at the next display boundary, accounting for rendering time.
@@ -285,6 +296,7 @@ function _countdown(t::Time; now_ns=time_ns, wait=sleep, io::IO=stdout,
     catch e
         e isa InterruptException || rethrow()
     end
+    _live_finish(io, render)
     return nothing
 end
 
@@ -295,9 +307,9 @@ _elapsed_time(ns::Unsigned) =
 
 function _stopwatch(duration::AbstractFloat; now_ns=time_ns, wait=sleep,
                     io::IO=stdout, fonts=FONTS, termsize=() -> displaysize(io),
-                    clear=() -> print(io, CLEAR_SCREEN),
-                    render=t -> println(io, _live_frame(
-                        fonts, f -> stopwatch_frame(f, t), termsize())))
+                    clear=() -> nothing, render=nothing)
+    draw = render === nothing ?
+           _live_render(io, fonts, stopwatch_frame, termsize) : render
     isfinite(duration) && duration > 0 ||
         throw(ArgumentError("refresh interval must be finite and positive"))
     interval_ns = max(round(Int128, duration * 1e9), 1)
@@ -307,7 +319,7 @@ function _stopwatch(duration::AbstractFloat; now_ns=time_ns, wait=sleep,
             elapsed = now_ns() - start
             t = _elapsed_time(elapsed)::Time
             clear()
-            render(t)
+            draw(t)
             # Schedule from the origin, so rendering and clearing do not add
             # to every refresh interval. Missed deadlines trigger a fresh frame.
             deadline = (fld(Int128(elapsed), interval_ns) + 1) * interval_ns
@@ -317,6 +329,7 @@ function _stopwatch(duration::AbstractFloat; now_ns=time_ns, wait=sleep,
     catch e
         e isa InterruptException || rethrow()
     end
+    _live_finish(io, render)
     return nothing
 end
 
@@ -324,18 +337,19 @@ stopwatch(duration::AbstractFloat=0.01) = _stopwatch(duration)
 
 function _clock(; now=Dates.now, wait=sleep, io::IO=stdout, fonts=FONTS,
                 termsize=() -> displaysize(io),
-                clear=() -> print(io, CLEAR_SCREEN),
-                render=t -> println(io, _live_frame(
-                    fonts, f -> clock_frame(f, t), termsize())))
+                clear=() -> nothing, render=nothing)
+    draw = render === nothing ?
+           _live_render(io, fonts, clock_frame, termsize) : render
     try
         while true
             clear()
-            render(Dates.Time(now()))
+            draw(Dates.Time(now()))
             wait(0.5)
         end
     catch e
         e isa InterruptException || rethrow()
     end
+    _live_finish(io, render)
     return nothing
 end
 

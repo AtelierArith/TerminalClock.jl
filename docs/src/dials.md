@@ -23,8 +23,8 @@ does not change fonts.
 The live displays choose among the loaded dials by terminal size on every
 refresh: the first candidate dial is used when it fits, then `Keycap`, then
 `Text`, so a small pane switches to a smaller dial automatically. A frame fits
-when it has at most one row fewer than the terminal height and no more columns
-than its width. The last candidate is used when nothing fits.
+when its height is at most the terminal's rows minus 1 and its width is at most
+the terminal's columns. The last candidate is used when nothing fits.
 
 To restore the default:
 
@@ -111,11 +111,14 @@ Julia:
 TerminalClock.set_dials(["/path/to/Big.toml", "/path/to/Medium.toml"])
 ```
 
+`set_dials` with a path and `set_dials` with a vector replace each other: the
+most recent `set_dials` call wins, and the other saved preference is removed.
+
 Candidates are ordered: the registered files in the order given, then the
 bundled `Keycap` and `Text` dials. With no registered files, the order is the
 `tomlfile` preference (or the bundled ASCII dials), then `Keycap`, then `Text`.
-A dial fits when its frame has at most one row fewer than the terminal height
-and is no wider than the terminal. The first candidate that fits is used, with
+A dial fits when its frame's height is at most the terminal's rows minus 1 and
+its width is at most the terminal's columns. The first candidate that fits is used, with
 no sorting by size; if none fits, the last one (`Text`) is used.
 
 Single-frame calls such as `clock(Time(12, 34, 56))` always use the first

@@ -178,6 +178,49 @@ end
 """,
         )
 
+        # the most recent set_dials call wins: vector then string
+        activate_and_run(
+            project_dir,
+            """
+    using TerminalClock
+    dir = joinpath(dirname(pathof(TerminalClock)), "dials")
+    TerminalClock.set_dials(joinpath(dir, "ASCII2.toml"))
+""",
+        )
+        prefs = local_prefs_toml |> TOML.parsefile
+        @test !haskey(prefs["TerminalClock"], "tomlfiles")
+        activate_and_run(
+            project_dir,
+            """
+    using Test
+    using TerminalClock, Dates
+    @test length(TerminalClock.FONTS) == 3
+    ascii2 = TerminalClock.load_font(joinpath(dirname(pathof(TerminalClock)), "dials", "ASCII2.toml"))
+    dt = DateTime(2021, 11, 15, 12, 34, 56, 7)
+    @test clock(dt) == TerminalClock.clock_frame(ascii2, Time(dt))
+""",
+        )
+
+        # ... and string then vector
+        activate_and_run(
+            project_dir,
+            """
+    using TerminalClock
+    dir = joinpath(dirname(pathof(TerminalClock)), "dials")
+    TerminalClock.set_dials([joinpath(dir, "UnicodeBox.toml"), joinpath(dir, "ASCII2.toml")])
+""",
+        )
+        prefs = local_prefs_toml |> TOML.parsefile
+        @test !haskey(prefs["TerminalClock"], "tomlfile")
+        activate_and_run(
+            project_dir,
+            """
+    using Test
+    using TerminalClock
+    @test length(TerminalClock.FONTS) == 4
+""",
+        )
+
         # test for clear_dials
         activate_and_run(
             project_dir,
@@ -294,12 +337,13 @@ using TerminalClock: FONTS
         wait=seconds -> (ticks[] += round(UInt64, seconds * 1e9)),
         termsize=() -> sizes[(calls[] += 1)])
     out = String(take!(io))
-    frames = split(out, TerminalClock.CLEAR_SCREEN; keepempty=false)
+    @test endswith(out, "\n")
+    frames = split(chopsuffix(out, "\n"), TerminalClock.CLEAR_SCREEN; keepempty=false)
     @test startswith(out, TerminalClock.CLEAR_SCREEN)
     @test length(frames) == 3
-    @test frames[1] == clock(Time(0, 0, 2)) * "\n"
-    @test frames[2] == clock_frame(FONTS[2], Time(0, 0, 1)) * "\n"
-    @test frames[3] == "00:00:00\n"
+    @test frames[1] == clock(Time(0, 0, 2))
+    @test frames[2] == clock_frame(FONTS[2], Time(0, 0, 1))
+    @test frames[3] == "00:00:00"
 end
 
 @testset "stopwatch live display uses stopwatch frames" begin
@@ -309,9 +353,9 @@ end
         now_ns=() -> UInt64(0), wait=_ -> nothing,
         termsize=() -> ((n[] += 1) > 1 && throw(InterruptException()); (2, 20)))
     # The first frame is keycap (width 16 <= 20). On the second pass termsize
-    # throws during render, after the screen was cleared.
+    # throws before anything is written; the end of the display adds one newline.
     @test String(take!(io)) == TerminalClock.CLEAR_SCREEN *
-          stopwatch_frame(FONTS[2], Time(0)) * "\n" * TerminalClock.CLEAR_SCREEN
+          stopwatch_frame(FONTS[2], Time(0)) * "\n"
 end
 
 @testset "clock live display leaves the last frame" begin
@@ -320,7 +364,21 @@ end
     TerminalClock._clock(; io, now=() -> DateTime(2026, 1, 1, 12, 34, 56),
         wait=_ -> (n[] += 1) == 2 && throw(InterruptException()),
         termsize=() -> (2, 10))   # keycap (width 14) does not fit, so text
-    @test String(take!(io)) == repeat(TerminalClock.CLEAR_SCREEN * "12:34:56\n", 2)
+    @test String(take!(io)) == repeat(TerminalClock.CLEAR_SCREEN * "12:34:56", 2) * "\n"
+end
+
+@testset "live display writes clear and frame in one write" begin
+    struct CountingIO <: IO
+        buf::IOBuffer
+        writes::Vector{String}
+    end
+    Base.unsafe_write(io::CountingIO, p::Ptr{UInt8}, n::UInt) =
+        (push!(io.writes, unsafe_string(p, n)); unsafe_write(io.buf, p, n))
+    Base.write(io::CountingIO, x::UInt8) = (push!(io.writes, String([x])); write(io.buf, x))
+    io = CountingIO(IOBuffer(), String[])
+    TerminalClock._clock(; io, now=() -> DateTime(2026, 1, 1, 12, 34, 56),
+        wait=_ -> throw(InterruptException()), termsize=() -> (2, 10))
+    @test io.writes[1] == TerminalClock.CLEAR_SCREEN * "12:34:56"
 end
 
 
@@ -355,6 +413,13 @@ end
     font = Font(tiny_text_toml(""))
     @test clock_frame(font, Time(12, 34, 56)) == "12:34:56"
     @test stopwatch_frame(font, Time(1, 2, 3, 456)) == "02:03:456"
+end
+
+@testset "Keycap stopwatch_frame" begin
+    k(n) = "$(n)\uFE0F\u20E3"
+    font = TerminalClock.load_font(joinpath(dirname(pathof(TerminalClock)), "dials", "Keycap.toml"))
+    @test stopwatch_frame(font, Time(12, 34, 56, 789)) ==
+          k(3) * k(4) * ":" * k(5) * k(6) * ":" * k(7) * k(8) * k(9)
 end
 
 @testset "stopwatch_frame uses the Large separator" begin

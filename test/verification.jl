@@ -26,6 +26,9 @@ end
     JET.@test_call TerminalClock._countdown(Time(0, 10);
         now_ns=() -> UInt64(0), wait=_ -> nothing,
         render=_ -> nothing, clear=() -> nothing)
+    # Keep the default renderer so _live_frame and select_font are analyzed.
+    JET.@test_call TerminalClock._countdown(Time(0); io=IOBuffer(),
+        termsize=() -> (24, 80), now_ns=() -> UInt64(0), wait=_ -> nothing)
     JET.@test_call TerminalClock._clock(; now=() -> DateTime(2026),
         wait=_ -> nothing, render=_ -> nothing, clear=() -> nothing,
         termsize=() -> (24, 80))
