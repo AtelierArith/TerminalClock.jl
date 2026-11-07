@@ -327,6 +327,72 @@ using TerminalClock: _displaywidth, Dial, Font, load_font, clock_frame, stopwatc
 
 using TerminalClock: FONTS
 
+# A small terminal model: applies cursor positioning (H), erase in line (K)
+# and erase below (J) so tests can catch stale suffixes, stale rows and
+# premature erasure. Wide graphemes occupy their display width in cells.
+function apply_update!(screen, update)
+    row, col = 1, 1
+    rows, cols = size(screen)
+    for token in eachmatch(r"\e\[([0-9;]*)([HKJ])|[^\e]+", update)
+        if isnothing(token[2])
+            for g in Base.Unicode.graphemes(token.match)
+                w = _displaywidth(g)
+                screen[row, col] = string(g)
+                for k in 1:w-1
+                    screen[row, col+k] = ""
+                end
+                col = min(col + w, cols)
+            end
+        elseif token[2] == "H"
+            r, c = isempty(token[1]) ? (1, 1) : parse.(Int, split(token[1], ';'))
+            row, col = min(r, rows), min(c, cols)
+        elseif token[2] == "K"
+            screen[row, col:end] .= " "
+        elseif token[2] == "J"
+            screen[row, col:end] .= " "
+            screen[row+1:end, :] .= " "
+        end
+    end
+    return screen
+end
+
+function expected_screen(frame, rows, cols)
+    screen = fill(" ", rows, cols)
+    apply_update!(screen, join(("\e[$(i);1H" * line for (i, line) in
+                                enumerate(split(frame, '\n'))), ""))
+    return screen
+end
+
+@testset "overwrite_update redraws in place" begin
+    overwrite_update = TerminalClock.overwrite_update
+    rows, cols = 6, 20
+    screen = fill("#", rows, cols)          # leftover REPL output
+    for frame in ("long first\nsecond\nthird", "x\ny", "1️⃣2️⃣:3️⃣", "back")
+        update = overwrite_update(frame, (rows, cols))
+        apply_update!(screen, update)
+        @test screen == expected_screen(frame, rows, cols)
+        @test !occursin("\e[2J", update)
+        # Content is written before anything below it is erased.
+        @test findfirst(first(split(frame, '\n')), update).start <
+              findfirst("\e[J", update).start
+        # The cursor ends right after the last row of the frame.
+        last_row = split(frame, '\n')[end]
+        n = length(split(frame, '\n'))
+        @test endswith(update, "\e[$(n);$(_displaywidth(last_row) + 1)H")
+    end
+end
+
+@testset "overwrite_update at the terminal edges" begin
+    overwrite_update = TerminalClock.overwrite_update
+    # A full-width row gets no erase-in-line, which some terminals would apply
+    # to the last cell while the cursor waits to wrap.
+    @test overwrite_update("abcd\nab", (5, 4)) ==
+          "\e[1;1Habcd\e[2;1Hab\e[K\e[3;1H\e[J\e[2;3H"
+    # With no row left below the frame there is nothing to erase there; moving
+    # down would land on the frame's own last row and erase it.
+    @test overwrite_update("12:34:56", (1, 8)) == "\e[1;1H12:34:56"
+end
+
 @testset "live display switches dials by terminal size" begin
     sizes = [(40, 200), (3, 40), (2, 8)]   # large / keycap (width 14) / text
     calls = Ref(0)
@@ -337,13 +403,11 @@ using TerminalClock: FONTS
         wait=seconds -> (ticks[] += round(UInt64, seconds * 1e9)),
         termsize=() -> sizes[(calls[] += 1)])
     out = String(take!(io))
-    @test endswith(out, "\n")
-    frames = split(chopsuffix(out, "\n"), TerminalClock.CLEAR_SCREEN; keepempty=false)
-    @test startswith(out, TerminalClock.CLEAR_SCREEN)
-    @test length(frames) == 3
-    @test frames[1] == clock(Time(0, 0, 2))
-    @test frames[2] == clock_frame(FONTS[2], Time(0, 0, 1))
-    @test frames[3] == "00:00:00"
+    update = TerminalClock.overwrite_update
+    @test out == update(clock(Time(0, 0, 2)), sizes[1]) *
+                 update(clock_frame(FONTS[2], Time(0, 0, 1)), sizes[2]) *
+                 update("00:00:00", sizes[3]) * "\n"
+    @test !occursin(TerminalClock.CLEAR_SCREEN, out)
 end
 
 @testset "stopwatch live display uses stopwatch frames" begin
@@ -364,10 +428,11 @@ end
     TerminalClock._clock(; io, now=() -> DateTime(2026, 1, 1, 12, 34, 56),
         wait=_ -> (n[] += 1) == 2 && throw(InterruptException()),
         termsize=() -> (2, 10))   # keycap (width 14) does not fit, so text
-    @test String(take!(io)) == repeat(TerminalClock.CLEAR_SCREEN * "12:34:56", 2) * "\n"
+    @test String(take!(io)) ==
+          repeat(TerminalClock.overwrite_update("12:34:56", (2, 10)), 2) * "\n"
 end
 
-@testset "live display writes clear and frame in one write" begin
+@testset "live display writes each update in one write" begin
     struct CountingIO <: IO
         buf::IOBuffer
         writes::Vector{String}
@@ -378,7 +443,14 @@ end
     io = CountingIO(IOBuffer(), String[])
     TerminalClock._clock(; io, now=() -> DateTime(2026, 1, 1, 12, 34, 56),
         wait=_ -> throw(InterruptException()), termsize=() -> (2, 10))
-    @test io.writes[1] == TerminalClock.CLEAR_SCREEN * "12:34:56"
+    @test io.writes[1] == TerminalClock.overwrite_update("12:34:56", (2, 10))
+
+    # The stopwatch keeps the clear-screen redraw, also in one write.
+    io = CountingIO(IOBuffer(), String[])
+    n = Ref(0)
+    TerminalClock._stopwatch(0.1; io, now_ns=() -> UInt64(0), wait=_ -> nothing,
+        termsize=() -> ((n[] += 1) > 1 && throw(InterruptException()); (2, 10)))
+    @test io.writes[1] == TerminalClock.CLEAR_SCREEN * "00:00:000"
 end
 
 

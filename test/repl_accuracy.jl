@@ -40,6 +40,22 @@ function digit_maps()
         for (n, name) in enumerate(names)) for size in ("Large", "Small"))
 end
 
+# Byte range of the first `ESC [ <row> ; 1 H` in `bytes`, or nothing. Works on
+# raw bytes because a read can end in the middle of a multi-byte character.
+function find_row_position(bytes)
+    for i in 1:length(bytes)-1
+        bytes[i] == 0x1b && bytes[i+1] == UInt8('[') || continue
+        j = i + 2
+        while j <= length(bytes) && UInt8('0') <= bytes[j] <= UInt8('9')
+            j += 1
+        end
+        j > i + 2 && j + 2 <= length(bytes) || continue
+        bytes[j] == UInt8(';') && bytes[j+1] == UInt8('1') && bytes[j+2] == UInt8('H') &&
+            return i:j+2
+    end
+    return nothing
+end
+
 function decode_frame(rows, mode, maps)
     fields = mode == "stopwatch" ?
         [(0, 9, "Large"), (10, 9, "Large"), (30, 9, "Large"),
@@ -131,10 +147,14 @@ function test_repl_accuracy(mode="stopwatch",
                 continue
             end
             while true
-                # A frame has no trailing newline: its last row ends where the
-                # next clear-screen sequence begins.
+                # A row ends at a newline, at a clear-screen sequence (stopwatch)
+                # or at a row-positioning sequence (overwrite redraw of the
+                # countdown); a frame has no trailing newline.
                 newline = findfirst(==(0x0a), pending)
-                clear = findfirst(codeunits(TerminalClock.CLEAR_SCREEN), pending)
+                clear = something(
+                    findfirst(codeunits(TerminalClock.CLEAR_SCREEN), pending),
+                    find_row_position(pending),
+                    Some(nothing))
                 isnothing(newline) && isnothing(clear) && break
                 if !isnothing(clear) && (isnothing(newline) || clear.start < newline)
                     line = String(pending[1:clear.start-1])

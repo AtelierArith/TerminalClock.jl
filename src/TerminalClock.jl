@@ -125,18 +125,51 @@ n2d(n::Int, ::Val{:Large}) = n2d(DIALS_LARGE, n)
 n2d(n::Int, ::Val{:Small}) = n2d(DIALS_SMALL, n)
 n2d(n::Int) = n2d(n, :Large)
 
-# Clear the whole screen and home the cursor. Live displays assume a pane of
-# their own, so there is no line-by-line bookkeeping to go wrong on resize.
+# Clear the whole screen and home the cursor. The stopwatch redraws this way;
+# live displays assume a pane of their own.
 const CLEAR_SCREEN = "\e[H\e[2J"
+
+clear_update(frame::AbstractString, ::Tuple{Int,Int}) = CLEAR_SCREEN * frame
+
+"""
+    overwrite_update(frame, termsize) -> String
+
+Build a terminal update that draws `frame` from the top-left corner without
+clearing the screen first, so no blank screen is ever shown between frames.
+Each row is written in place and the rest of a shorter row is erased; rows
+below the frame are erased after it is drawn. The cursor ends right after the
+frame's last row.
+"""
+function overwrite_update(frame::AbstractString, (rows, cols)::Tuple{Int,Int})
+    out = IOBuffer()
+    lines = split(frame, '\n')
+    for (row, line) in enumerate(lines)
+        print(out, "\e[", row, ";1H", line)
+        # A full-width row needs no erase: some terminals would apply it to the
+        # last cell while the cursor waits to wrap.
+        _displaywidth(line) < cols && print(out, "\e[K")
+    end
+    n = length(lines)
+    if n < rows
+        # Erase old rows below, then return to the end of the frame.
+        print(out, "\e[", n + 1, ";1H\e[J\e[", n, ";", _displaywidth(lines[end]) + 1, "H")
+    end
+    return String(take!(out))
+end
 
 _live_frame(fonts, frame, termsize::Tuple{Int,Int})::String =
     frame(select_font(fonts, frame, termsize))
 
-# Default live renderer: clear and frame go out in one write, so a redraw cannot
+# Default live renderer: each update goes out in one write, so a redraw cannot
 # be seen (or interrupted) half done, and the frame has no trailing newline so
 # a one-row pane does not scroll it away.
-_live_render(io::IO, fonts, frame, termsize) =
-    t -> print(io, CLEAR_SCREEN * _live_frame(fonts, f -> frame(f, t), termsize()))
+function _live_render(io::IO, fonts, frame, termsize, update=overwrite_update)
+    return t -> begin
+        size = termsize()
+        write(io, update(_live_frame(fonts, f -> frame(f, t), size), size))
+        flush(io)
+    end
+end
 
 # Leave the cursor on a fresh line below the last frame (default renderer only).
 _live_finish(io::IO, render) = (render === nothing && println(io); nothing)
@@ -149,8 +182,9 @@ _live_finish(io::IO, render) = (render === nothing && println(io); nothing)
 Display the current local wall-clock time as `HH:MM:SS` until Ctrl+C.
 The live display refreshes approximately every 0.5 seconds.
 
-The live display clears the whole screen on every refresh, so run it in a pane
-of its own. If the terminal is too small for the dial, it switches to the next
+The live display redraws in place from the top-left corner on every refresh
+(each row is overwritten and leftover text is erased), so run it in a pane of
+its own. If the terminal is too small for the dial, it switches to the next
 candidate (down to plain text) automatically. The last frame stays on
 screen after exit.
 
@@ -246,8 +280,9 @@ part. Remaining seconds are rounded up. A monotonic clock prevents rendering
 and scheduler delays from accumulating; a slow terminal can delay an update.
 There is no extra sleep after zero. Press Ctrl+C to stop early.
 
-The live display clears the whole screen on every refresh, so run it in a pane
-of its own. If the terminal is too small for the dial, it switches to the next
+The live display redraws in place from the top-left corner on every refresh
+(each row is overwritten and leftover text is erased), so run it in a pane of
+its own. If the terminal is too small for the dial, it switches to the next
 candidate (down to plain text) automatically. The last frame stays on
 screen after exit.
 
@@ -309,7 +344,7 @@ function _stopwatch(duration::AbstractFloat; now_ns=time_ns, wait=sleep,
                     io::IO=stdout, fonts=FONTS, termsize=() -> displaysize(io),
                     clear=() -> nothing, render=nothing)
     draw = render === nothing ?
-           _live_render(io, fonts, stopwatch_frame, termsize) : render
+           _live_render(io, fonts, stopwatch_frame, termsize, clear_update) : render
     isfinite(duration) && duration > 0 ||
         throw(ArgumentError("refresh interval must be finite and positive"))
     interval_ns = max(round(Int128, duration * 1e9), 1)
