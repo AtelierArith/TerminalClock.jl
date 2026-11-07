@@ -7,12 +7,21 @@ CurrentModule = TerminalClock
 ## Terminal requirements
 
 Use a terminal with ANSI cursor movement and a monospace font. The live displays
-erase and redraw lines in place. The bundled ASCII-style dials also use a Unicode
+are meant for a pane or window of their own; anything else on that screen is
+erased. `clock()` and `countdown()` redraw in place from the top-left corner:
+every row is overwritten, the rest of shorter rows (`ESC[K`) and the rows below
+the frame (`ESC[J`) are erased afterwards, and the whole update is sent in one
+write, so no blank screen appears between frames. `stopwatch()` clears the whole
+screen (`ESC[H ESC[2J`) together with each frame in one write. The last frame
+stays on screen when you exit with Ctrl+C or the countdown ends. The bundled ASCII-style dials also use a Unicode
 colon symbol, so UTF-8 support is useful.
 
-Give the default clock/countdown at least **79 columns and 9 rows**; the default
-stopwatch uses **73 columns and 9 rows**. A narrower terminal can wrap lines and
-leave stale output. Custom fonts may require different dimensions.
+Give the default clock/countdown at least **79 columns and 10 rows** (the dial height plus one); the default
+stopwatch uses **73 columns and 10 rows**. Small panes are fine:
+each refresh checks the terminal size and picks the first candidate dial that
+fits (the default dial, then the Keycap dial, then plain text such as
+`12:34:56`), so shrinking or enlarging the pane switches dials automatically.
+Custom fonts may require different dimensions.
 
 Run a single display at a time. Logging or printing from other tasks to the
 same terminal can disrupt cursor placement. Captured output in notebooks and CI
@@ -105,7 +114,8 @@ without sleeping for another second. Ctrl+C ends the timer early.
 
 | Symptom | What to check |
 |:--|:--|
-| Rows drift or overlap | Increase terminal width/height; stop other output to the same terminal. |
+| Output looks small or plain | The pane is too small for the large dial; enlarge it and the dial switches back on the next refresh. |
+| Other text disappears | The live display takes over the whole screen; use a dedicated pane. |
 | Cursor codes appear in a log | Render a single frame with `clock(t)` or `stopwatch(t)`. |
 | Digits update in bursts | Reduce terminal load; a shorter interval cannot prevent OS or terminal stalls. |
 | A saved custom dial fails to load | See [Recovering from a bad preference](@ref dial-recovery). |

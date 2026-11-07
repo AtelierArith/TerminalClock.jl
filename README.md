@@ -81,6 +81,14 @@ julia> using TerminalClock; countdown() # equivalent to `countdown(hour=0, minut
 +-------+ +-------+           +-------+ +-------+           +-------+ +-------+
 ```
 
+# Small panes and dial candidates
+
+The live `clock()` and `countdown()` redraw in place from the top-left corner,
+`stopwatch()` clears the whole screen on every refresh, and all three switch automatically to the bundled Keycap and then plain
+Text dials when the pane is too small for the default dial. Several dials can be
+registered at once with `TerminalClock.set_dials(["/path/a.toml", "/path/b.toml"])`.
+See the [documentation](https://atelierarith.github.io/TerminalClock.jl/dev/) for details.
+
 # Another option for dial?
 
 1. Prepare "YourDials.toml" e.g. [src/dials/UnicodeBox.toml](./src/dials/UnicodeBox.toml).

@@ -29,12 +29,31 @@ end
 
 function digit_maps()
     dials = TOML.parsefile(TerminalClock.default_tomlfile())
-    TerminalClock.toml == dials ||
+    default_font = TerminalClock.load_font(TerminalClock.default_tomlfile())
+    TerminalClock.load_dials() == dials &&
+        TerminalClock.clock_frame(TerminalClock.FONTS[1], Time(12, 34, 56)) ==
+        TerminalClock.clock_frame(default_font, Time(12, 34, 56)) ||
         error("Run this optional test with the default ASCII dial preferences.")
     names = ["zero", "one", "two", "three", "four", "five",
              "six", "seven", "eight", "nine"]
     return Dict(size => Dict(Tuple(dials[size][name]) => n - 1
         for (n, name) in enumerate(names)) for size in ("Large", "Small"))
+end
+
+# Byte range of the first `ESC [ <row> ; 1 H` in `bytes`, or nothing. Works on
+# raw bytes because a read can end in the middle of a multi-byte character.
+function find_row_position(bytes)
+    for i in 1:length(bytes)-1
+        bytes[i] == 0x1b && bytes[i+1] == UInt8('[') || continue
+        j = i + 2
+        while j <= length(bytes) && UInt8('0') <= bytes[j] <= UInt8('9')
+            j += 1
+        end
+        j > i + 2 && j + 2 <= length(bytes) || continue
+        bytes[j] == UInt8(';') && bytes[j+1] == UInt8('1') && bytes[j+2] == UInt8('H') &&
+            return i:j+2
+    end
+    return nothing
 end
 
 function decode_frame(rows, mode, maps)
@@ -84,6 +103,17 @@ function test_repl_accuracy(mode="stopwatch",
     command = mode == "stopwatch" ? "stopwatch()" :
               "countdown(Time(0) + Second($seconds))"
     input = Vector{UInt8}("using TerminalClock, Dates; $command\n")
+    # Take one cleaned display row; returns true once the final frame is seen.
+    function accept(chars, received)
+        length(chars) == width || return false
+        push!(rows, chars)
+        length(rows) == 9 || return false
+        shown = decode_frame(rows, mode, maps)
+        empty!(rows)
+        isnothing(shown) && return false
+        push!(samples, (received, Float64(shown)))
+        return mode == "stopwatch" ? shown >= seconds : shown == 0
+    end
     try
         finished = false
         while !finished
@@ -117,23 +147,36 @@ function test_repl_accuracy(mode="stopwatch",
                 continue
             end
             while true
+                # A row ends at a newline, at a clear-screen sequence (stopwatch)
+                # or at a row-positioning sequence (overwrite redraw of the
+                # countdown); a frame has no trailing newline.
                 newline = findfirst(==(0x0a), pending)
-                isnothing(newline) && break
-                line = String(pending[1:newline-1])
-                deleteat!(pending, 1:newline)
+                clear = something(
+                    findfirst(codeunits(TerminalClock.CLEAR_SCREEN), pending),
+                    find_row_position(pending),
+                    Some(nothing))
+                isnothing(newline) && isnothing(clear) && break
+                if !isnothing(clear) && (isnothing(newline) || clear.start < newline)
+                    line = String(pending[1:clear.start-1])
+                    deleteat!(pending, 1:clear.start-1)
+                    deleteat!(pending, 1:length(clear))
+                else
+                    line = String(pending[1:newline-1])
+                    deleteat!(pending, 1:newline)
+                end
                 position(transcript) < 8192 && println(transcript, line)
                 clean = replace(line, r"\x1b\[[0-?]*[ -/]*[@-~]" => "", "\r" => "")
-                chars = collect(clean)
-                length(chars) == width || continue
-                push!(rows, chars)
-                length(rows) == 9 || continue
-                shown = decode_frame(rows, mode, maps)
-                empty!(rows)
-                isnothing(shown) && continue
-                push!(samples, (received, Float64(shown)))
-                if mode == "stopwatch" ? shown >= seconds : shown == 0
-                    finished = true
-                    break
+                accept(collect(clean), received) || continue
+                finished = true
+                break
+            end
+            # The last row of a frame has no newline yet: take it as soon as
+            # it is complete so the frame is timed when it was received.
+            if !finished
+                tail = replace(String(copy(pending)), r"\x1b\[[0-?]*[ -/]*[@-~]" => "", "\r" => "")
+                if length(rows) == 8 && length(tail) == width
+                    empty!(pending)
+                    finished = accept(collect(tail), received)
                 end
             end
         end

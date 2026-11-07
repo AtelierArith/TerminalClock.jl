@@ -81,6 +81,40 @@ end
     @test setup_timer(hour=1, minute=2, second=3) == Time(1, 2, 3)
 end
 
+using TerminalClock: framesize, select_font, FONTS, clock_frame
+
+@testset "framesize" begin
+    @test framesize("12:34:56") == (1, 8)
+    @test framesize("ab\nabcd") == (2, 4)
+    @test framesize(clock(Time(12, 34, 56))) == (9, 79)  # measured for ASCII
+end
+
+@testset "default candidates" begin
+    @test length(FONTS) == 3
+    @test clock_frame(FONTS[end], Time(1, 2, 3)) == "01:02:03"
+    @test clock_frame(FONTS[2], Time(1, 2, 3)) == "0️⃣1️⃣:0️⃣2️⃣:0️⃣3️⃣"
+end
+
+@testset "select_font" begin
+    f = font -> clock_frame(font, Time(12, 34, 56))
+    big_rows, big_cols = framesize(f(FONTS[1]))
+    @test select_font(FONTS, f, (big_rows + 1, big_cols)) === FONTS[1]
+    @test select_font(FONTS, f, (big_rows, big_cols)) === FONTS[2]
+    @test select_font(FONTS, f, (40, 14)) === FONTS[2]
+    @test select_font(FONTS, f, (40, 13)) === FONTS[3]
+end
+
+@testset "select_font falls back to last" begin
+    f = font -> clock_frame(font, Time(12, 34, 56))
+    @test select_font(FONTS, f, (1, 4)) === FONTS[end]
+end
+
+@testset "select_font respects order" begin
+    f = font -> clock_frame(font, Time(12, 34, 56))
+    fonts = [FONTS[3], FONTS[1]]
+    @test select_font(fonts, f, (100, 300)) === FONTS[3]
+end
+
 @testset "preference" begin
     local_prefs_toml =
         joinpath(dirname(dirname(pathof(TerminalClock))), "LocalPreferences.toml")
@@ -119,6 +153,74 @@ end
 """,
         )
 
+        # test for multiple candidates
+        activate_and_run(
+            project_dir,
+            """
+    using TerminalClock
+    dir = joinpath(dirname(pathof(TerminalClock)), "dials")
+    TerminalClock.set_dials([joinpath(dir, "UnicodeBox.toml"), joinpath(dir, "ASCII2.toml")])
+""",
+        )
+        prefs = local_prefs_toml |> TOML.parsefile
+        @test basename.(prefs["TerminalClock"]["tomlfiles"]) ==
+              ["UnicodeBox.toml", "ASCII2.toml"]
+
+        activate_and_run(
+            project_dir,
+            """
+    using Test
+    using TerminalClock, Dates
+    @test length(TerminalClock.FONTS) == 4
+    dt = DateTime(2021, 11, 15, 12, 34, 56, 7)
+    txt = joinpath("references", "UnicodeBox", "clock.txt")
+    @test clock(dt) == join(readlines(txt), "\n")
+""",
+        )
+
+        # the most recent set_dials call wins: vector then string
+        activate_and_run(
+            project_dir,
+            """
+    using TerminalClock
+    dir = joinpath(dirname(pathof(TerminalClock)), "dials")
+    TerminalClock.set_dials(joinpath(dir, "ASCII2.toml"))
+""",
+        )
+        prefs = local_prefs_toml |> TOML.parsefile
+        @test !haskey(prefs["TerminalClock"], "tomlfiles")
+        activate_and_run(
+            project_dir,
+            """
+    using Test
+    using TerminalClock, Dates
+    @test length(TerminalClock.FONTS) == 3
+    ascii2 = TerminalClock.load_font(joinpath(dirname(pathof(TerminalClock)), "dials", "ASCII2.toml"))
+    dt = DateTime(2021, 11, 15, 12, 34, 56, 7)
+    @test clock(dt) == TerminalClock.clock_frame(ascii2, Time(dt))
+""",
+        )
+
+        # ... and string then vector
+        activate_and_run(
+            project_dir,
+            """
+    using TerminalClock
+    dir = joinpath(dirname(pathof(TerminalClock)), "dials")
+    TerminalClock.set_dials([joinpath(dir, "UnicodeBox.toml"), joinpath(dir, "ASCII2.toml")])
+""",
+        )
+        prefs = local_prefs_toml |> TOML.parsefile
+        @test !haskey(prefs["TerminalClock"], "tomlfile")
+        activate_and_run(
+            project_dir,
+            """
+    using Test
+    using TerminalClock
+    @test length(TerminalClock.FONTS) == 4
+""",
+        )
+
         # test for clear_dials
         activate_and_run(
             project_dir,
@@ -133,6 +235,7 @@ end
             """
     using Test
     using TerminalClock, Dates
+    @test length(TerminalClock.FONTS) == 3
     dt = DateTime(2021, 11, 15, 12, 34, 56, 7)
     str = clock(dt)
     txt = joinpath("references", "ASCII", "clock.txt")
@@ -145,6 +248,9 @@ end
 """,
         )
     end # with_temp_depot
+    prefs = isfile(local_prefs_toml) ? TOML.parsefile(local_prefs_toml) : Dict()
+    @test !haskey(get(prefs, "TerminalClock", Dict()), "tomlfiles")
+    @test !haskey(get(prefs, "TerminalClock", Dict()), "tomlfile")
 end
 
 @testset "countdown timing" begin
@@ -162,7 +268,7 @@ end
                 push!(frames, (ticks[] / 1e9, shown))
                 ticks[] += render_ns
             end,
-            clear=_ -> nothing)
+            clear=() -> nothing)
         return frames, waits, ticks[] / 1e9
     end
 
@@ -208,11 +314,223 @@ include("verification.jl")
             ticks[] += 20_000_000 # rendering delay must count as elapsed time
             length(shown) == 601 && throw(InterruptException())
         end,
-        clear=_ -> nothing)
+        clear=() -> nothing)
     @test first(shown) == Time(0)
     @test last(shown) == Time(0, 1)
     @test shown[2] == Time(0, 0, 0, 100)
     for duration in (0.0, -0.1, Inf, NaN)
         @test_throws ArgumentError stopwatch(duration)
     end
+end
+
+using TerminalClock: _displaywidth, Dial, Font, load_font, clock_frame, stopwatch_frame
+
+using TerminalClock: FONTS
+
+# A small terminal model: applies cursor positioning (H), erase in line (K)
+# and erase below (J) so tests can catch stale suffixes, stale rows and
+# premature erasure. Wide graphemes occupy their display width in cells.
+function apply_update!(screen, update)
+    row, col = 1, 1
+    rows, cols = size(screen)
+    for token in eachmatch(r"\e\[([0-9;]*)([HKJ])|[^\e]+", update)
+        if isnothing(token[2])
+            for g in Base.Unicode.graphemes(token.match)
+                w = _displaywidth(g)
+                screen[row, col] = string(g)
+                for k in 1:w-1
+                    screen[row, col+k] = ""
+                end
+                col = min(col + w, cols)
+            end
+        elseif token[2] == "H"
+            r, c = isempty(token[1]) ? (1, 1) : parse.(Int, split(token[1], ';'))
+            row, col = min(r, rows), min(c, cols)
+        elseif token[2] == "K"
+            screen[row, col:end] .= " "
+        elseif token[2] == "J"
+            screen[row, col:end] .= " "
+            screen[row+1:end, :] .= " "
+        end
+    end
+    return screen
+end
+
+function expected_screen(frame, rows, cols)
+    screen = fill(" ", rows, cols)
+    apply_update!(screen, join(("\e[$(i);1H" * line for (i, line) in
+                                enumerate(split(frame, '\n'))), ""))
+    return screen
+end
+
+@testset "overwrite_update redraws in place" begin
+    overwrite_update = TerminalClock.overwrite_update
+    rows, cols = 6, 20
+    screen = fill("#", rows, cols)          # leftover REPL output
+    for frame in ("long first\nsecond\nthird", "x\ny", "1️⃣2️⃣:3️⃣", "back")
+        update = overwrite_update(frame, (rows, cols))
+        apply_update!(screen, update)
+        @test screen == expected_screen(frame, rows, cols)
+        @test !occursin("\e[2J", update)
+        # Content is written before anything below it is erased.
+        @test findfirst(first(split(frame, '\n')), update).start <
+              findfirst("\e[J", update).start
+        # The cursor ends right after the last row of the frame.
+        last_row = split(frame, '\n')[end]
+        n = length(split(frame, '\n'))
+        @test endswith(update, "\e[$(n);$(_displaywidth(last_row) + 1)H")
+    end
+end
+
+@testset "overwrite_update at the terminal edges" begin
+    overwrite_update = TerminalClock.overwrite_update
+    # A full-width row gets no erase-in-line, which some terminals would apply
+    # to the last cell while the cursor waits to wrap.
+    @test overwrite_update("abcd\nab", (5, 4)) ==
+          "\e[1;1Habcd\e[2;1Hab\e[K\e[3;1H\e[J\e[2;3H"
+    # With no row left below the frame there is nothing to erase there; moving
+    # down would land on the frame's own last row and erase it.
+    @test overwrite_update("12:34:56", (1, 8)) == "\e[1;1H12:34:56"
+end
+
+@testset "live display switches dials by terminal size" begin
+    sizes = [(40, 200), (3, 40), (2, 8)]   # large / keycap (width 14) / text
+    calls = Ref(0)
+    ticks = Ref(UInt64(0))
+    io = IOBuffer()
+    TerminalClock._countdown(Time(0, 0, 2); io,
+        now_ns=() -> ticks[],
+        wait=seconds -> (ticks[] += round(UInt64, seconds * 1e9)),
+        termsize=() -> sizes[(calls[] += 1)])
+    out = String(take!(io))
+    update = TerminalClock.overwrite_update
+    @test out == update(clock(Time(0, 0, 2)), sizes[1]) *
+                 update(clock_frame(FONTS[2], Time(0, 0, 1)), sizes[2]) *
+                 update("00:00:00", sizes[3]) * "\n"
+    @test !occursin(TerminalClock.CLEAR_SCREEN, out)
+end
+
+@testset "stopwatch live display uses stopwatch frames" begin
+    io = IOBuffer()
+    n = Ref(0)
+    TerminalClock._stopwatch(0.1; io,
+        now_ns=() -> UInt64(0), wait=_ -> nothing,
+        termsize=() -> ((n[] += 1) > 1 && throw(InterruptException()); (2, 20)))
+    # The first frame is keycap (width 16 <= 20). On the second pass termsize
+    # throws before anything is written; the end of the display adds one newline.
+    @test String(take!(io)) == TerminalClock.CLEAR_SCREEN *
+          stopwatch_frame(FONTS[2], Time(0)) * "\n"
+end
+
+@testset "clock live display leaves the last frame" begin
+    io = IOBuffer()
+    n = Ref(0)
+    TerminalClock._clock(; io, now=() -> DateTime(2026, 1, 1, 12, 34, 56),
+        wait=_ -> (n[] += 1) == 2 && throw(InterruptException()),
+        termsize=() -> (2, 10))   # keycap (width 14) does not fit, so text
+    @test String(take!(io)) ==
+          repeat(TerminalClock.overwrite_update("12:34:56", (2, 10)), 2) * "\n"
+end
+
+@testset "live display writes each update in one write" begin
+    struct CountingIO <: IO
+        buf::IOBuffer
+        writes::Vector{String}
+    end
+    Base.unsafe_write(io::CountingIO, p::Ptr{UInt8}, n::UInt) =
+        (push!(io.writes, unsafe_string(p, n)); unsafe_write(io.buf, p, n))
+    Base.write(io::CountingIO, x::UInt8) = (push!(io.writes, String([x])); write(io.buf, x))
+    io = CountingIO(IOBuffer(), String[])
+    TerminalClock._clock(; io, now=() -> DateTime(2026, 1, 1, 12, 34, 56),
+        wait=_ -> throw(InterruptException()), termsize=() -> (2, 10))
+    @test io.writes[1] == TerminalClock.overwrite_update("12:34:56", (2, 10))
+
+    # The stopwatch keeps the clear-screen redraw, also in one write.
+    io = CountingIO(IOBuffer(), String[])
+    n = Ref(0)
+    TerminalClock._stopwatch(0.1; io, now_ns=() -> UInt64(0), wait=_ -> nothing,
+        termsize=() -> ((n[] += 1) > 1 && throw(InterruptException()); (2, 10)))
+    @test io.writes[1] == TerminalClock.CLEAR_SCREEN * "00:00:000"
+end
+
+
+@testset "displaywidth" begin
+    @test _displaywidth("12:34") == 5
+    @test _displaywidth("1️⃣") == 2
+    @test _displaywidth("1️⃣2️⃣:") == 5
+    @test _displaywidth("🟥⬛") == 4
+    @test _displaywidth("█▒░") == 3
+end
+
+@testset "Dial pads rows to equal width" begin
+    @test Dial(["abc", "a"]).str == "abc\na  "
+    @test Dial(["1️⃣", "x"]).str == "1️⃣\nx "
+end
+
+const DIGIT_KEYS = ["zero", "one", "two", "three", "four",
+                    "five", "six", "seven", "eight", "nine"]
+function tiny_text_toml(sep)
+    large = Dict{String,Any}(k => [string(n)] for (n, k) in zip(0:9, DIGIT_KEYS))
+    large["colon"] = [":"]
+    sep === nothing || (large["separator"] = sep)
+    return Dict{String,Any}("Large" => large)
+end
+
+@testset "separator defaults to a space" begin
+    font = Font(tiny_text_toml(nothing))      # no separator
+    @test clock_frame(font, Time(12, 34, 56)) == "1 2 : 3 4 : 5 6"
+end
+
+@testset "separator joins glyphs" begin
+    font = Font(tiny_text_toml(""))
+    @test clock_frame(font, Time(12, 34, 56)) == "12:34:56"
+    @test stopwatch_frame(font, Time(1, 2, 3, 456)) == "02:03:456"
+end
+
+@testset "Keycap stopwatch_frame" begin
+    k(n) = "$(n)\uFE0F\u20E3"
+    font = TerminalClock.load_font(joinpath(dirname(pathof(TerminalClock)), "dials", "Keycap.toml"))
+    @test stopwatch_frame(font, Time(12, 34, 56, 789)) ==
+          k(3) * k(4) * ":" * k(5) * k(6) * ":" * k(7) * k(8) * k(9)
+end
+
+@testset "stopwatch_frame uses the Large separator" begin
+    toml = tiny_text_toml("")
+    toml["Small"] = merge(copy(toml["Large"]), Dict("separator" => "_", "colon" => ["."]))
+    @test stopwatch_frame(Font(toml), Time(0, 2, 3, 456)) == "02:03.456"
+end
+
+@testset "load_font reads a TOML file" begin
+    font = load_font(joinpath(pkgdir(TerminalClock), "src", "dials", "ASCII.toml"))
+    @test font isa Font
+    @test clock_frame(font, Time(12, 34, 56)) == clock(Time(12, 34, 56))
+end
+
+dialpath(name) = joinpath(dirname(pathof(TerminalClock)), "dials", name)
+
+@testset "bundled one-line dials" begin
+    text = load_font(dialpath("Text.toml"))
+    @test clock_frame(text, Time(12, 34, 56)) == "12:34:56"
+    @test stopwatch_frame(text, Time(12, 34, 56, 789)) == "34:56:789"
+    keycap = load_font(dialpath("Keycap.toml"))
+    k(n) = "$(n)️⃣"
+    @test clock_frame(keycap, Time(12, 34, 56)) == k(1)*k(2)*":"*k(3)*k(4)*":"*k(5)*k(6)
+end
+
+@testset "bundled dials have equal row widths" begin
+    for file in readdir(joinpath(dirname(pathof(TerminalClock)), "dials"))
+        toml = TOML.parsefile(dialpath(file))
+        for (table, glyphs) in toml, (key, rows) in glyphs
+            key == "separator" && continue
+            @test length(unique(_displaywidth.(rows))) == 1
+        end
+    end
+end
+
+@testset "ASCII2 references" begin
+    ascii2 = load_font(dialpath("ASCII2.toml"))
+    @test clock_frame(ascii2, Time(12, 34, 56)) ==
+          join(readlines(joinpath(@__DIR__, "references", "ASCII2", "clock.txt")), "\n")
+    @test stopwatch_frame(ascii2, Time(12, 34, 56, 789)) ==
+          join(readlines(joinpath(@__DIR__, "references", "ASCII2", "stopwatch.txt")), "\n")
 end
