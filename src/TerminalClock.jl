@@ -28,13 +28,28 @@ function set_dials(tomlfile::AbstractString)
 end
 
 """
+    TerminalClock.set_dials(tomlfiles::AbstractVector{<:AbstractString})
+
+Save several TOML dial files as candidates, in order. From the first, the
+first dial that fits the terminal is used. The bundled `Keycap.toml` and
+`Text.toml` dials follow the registered ones. Use absolute paths and restart
+Julia to load the new dials.
+"""
+function set_dials(tomlfiles::AbstractVector{<:AbstractString})
+    @set_preferences!("tomlfiles" => String[tomlfiles...])
+    @info("New dials set; restart your Julia session for this change to take effect!")
+end
+
+"""
     TerminalClock.clear_dials()
 
-Clear the saved dial preference. Restart Julia to load the bundled ASCII dials.
-This changes preferences for the active environment, not the current display.
+Clear the saved dial preferences (`tomlfile` and `tomlfiles`). Restart Julia to
+load the bundled ASCII dials. This changes preferences for the active
+environment, not the current display.
 """
 function clear_dials()
     @set_preferences!("tomlfile" => nothing)
+    @set_preferences!("tomlfiles" => nothing)
     @info("Dials cleared; restart your Julia session for this change to take effect!")
 end
 
@@ -46,10 +61,43 @@ end
 
 load_font(path::AbstractString) = Font(TOML.parsefile(path))
 
-# Placeholder until the font list is built from all bundled dials.
-const FONTS = [Font(load_dials())]
+function load_fonts()::Vector{Font}
+    files = String[@load_preference("tomlfiles", String[])...]
+    fonts = if isempty(files)
+        [Font(load_dials())]
+    else
+        Font[load_font(f) for f in files]
+    end
+    dir = joinpath(dirname(@__FILE__), "dials")
+    push!(fonts, load_font(joinpath(dir, "Keycap.toml")))
+    push!(fonts, load_font(joinpath(dir, "Text.toml")))
+    return fonts
+end
+
+const FONTS = load_fonts()
 const DIALS_LARGE = FONTS[1].large
 const DIALS_SMALL = FONTS[1].small
+
+"""
+Return `(rows, cols)` of a frame, where `cols` is the widest line by display width.
+"""
+function framesize(frame::AbstractString)::Tuple{Int,Int}
+    lines = split(frame, '\n')
+    return (length(lines), maximum(_displaywidth, lines))
+end
+
+"""
+Return the first font whose frame fits the terminal (`rows <= termrows - 1`
+and `cols <= termcols`), or the last font if none fits. `frame` maps a `Font`
+to a `String`.
+"""
+function select_font(fonts::AbstractVector{Font}, frame, termsize::Tuple{Int,Int})::Font
+    for font in fonts
+        rows, cols = framesize(frame(font))
+        rows <= termsize[1] - 1 && cols <= termsize[2] && return font
+    end
+    return last(fonts)
+end
 
 colon(dial::Dials) = Dial(getfield(dial, :colon))
 

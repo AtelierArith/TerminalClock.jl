@@ -93,13 +93,35 @@ colon = ["   ", " . ", " . "]
 
 This omits `[Small]`, so all glyphs use the same height and width.
 
+The `separator` of `[Small]` is ignored: the `[Large]` separator joins the
+whole stopwatch frame, including the small millisecond glyphs.
+
+## Registering several candidates
+
+Pass a vector to `set_dials` to register several dial files, then restart
+Julia:
+
+```julia
+TerminalClock.set_dials(["/path/to/Big.toml", "/path/to/Medium.toml"])
+```
+
+Candidates are ordered: the registered files in the order given, then the
+bundled `Keycap` and `Text` dials. With no registered files, the order is the
+`tomlfile` preference (or the bundled ASCII dials), then `Keycap`, then `Text`.
+A dial fits when its frame has at most one row fewer than the terminal height
+and is no wider than the terminal. The first candidate that fits is used, with
+no sorting by size; if none fits, the last one (`Text`) is used.
+
+Single-frame calls such as `clock(Time(12, 34, 56))` always use the first
+candidate.
+
 ## [Recovering from a bad preference](@id dial-recovery)
 
 A missing file, malformed TOML, or missing glyph can prevent
 `using TerminalClock`. In that case you cannot call `clear_dials()` yet.
 
 Open the active project's `LocalPreferences.toml` and remove the `tomlfile`
-entry from its `[TerminalClock]` section, preserving other settings. Restart
+and `tomlfiles` entries from its `[TerminalClock]` section, preserving other settings. Restart
 Julia and try the import again. If the preference is inherited from another
 environment, inspect that environment's preference file as well.
 

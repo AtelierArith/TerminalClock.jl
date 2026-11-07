@@ -81,6 +81,40 @@ end
     @test setup_timer(hour=1, minute=2, second=3) == Time(1, 2, 3)
 end
 
+using TerminalClock: framesize, select_font, FONTS, clock_frame
+
+@testset "framesize" begin
+    @test framesize("12:34:56") == (1, 8)
+    @test framesize("ab\nabcd") == (2, 4)
+    @test framesize(clock(Time(12, 34, 56))) == (9, 79)  # measured for ASCII
+end
+
+@testset "default candidates" begin
+    @test length(FONTS) == 3
+    @test clock_frame(FONTS[end], Time(1, 2, 3)) == "01:02:03"
+    @test clock_frame(FONTS[2], Time(1, 2, 3)) == "0️⃣1️⃣:0️⃣2️⃣:0️⃣3️⃣"
+end
+
+@testset "select_font" begin
+    f = font -> clock_frame(font, Time(12, 34, 56))
+    big_rows, big_cols = framesize(f(FONTS[1]))
+    @test select_font(FONTS, f, (big_rows + 1, big_cols)) === FONTS[1]
+    @test select_font(FONTS, f, (big_rows, big_cols)) === FONTS[2]
+    @test select_font(FONTS, f, (40, 14)) === FONTS[2]
+    @test select_font(FONTS, f, (40, 13)) === FONTS[3]
+end
+
+@testset "select_font falls back to last" begin
+    f = font -> clock_frame(font, Time(12, 34, 56))
+    @test select_font(FONTS, f, (1, 4)) === FONTS[end]
+end
+
+@testset "select_font respects order" begin
+    f = font -> clock_frame(font, Time(12, 34, 56))
+    fonts = [FONTS[3], FONTS[1]]
+    @test select_font(fonts, f, (100, 300)) === FONTS[3]
+end
+
 @testset "preference" begin
     local_prefs_toml =
         joinpath(dirname(dirname(pathof(TerminalClock))), "LocalPreferences.toml")
@@ -119,6 +153,31 @@ end
 """,
         )
 
+        # test for multiple candidates
+        activate_and_run(
+            project_dir,
+            """
+    using TerminalClock
+    dir = joinpath(dirname(pathof(TerminalClock)), "dials")
+    TerminalClock.set_dials([joinpath(dir, "UnicodeBox.toml"), joinpath(dir, "ASCII2.toml")])
+""",
+        )
+        prefs = local_prefs_toml |> TOML.parsefile
+        @test basename.(prefs["TerminalClock"]["tomlfiles"]) ==
+              ["UnicodeBox.toml", "ASCII2.toml"]
+
+        activate_and_run(
+            project_dir,
+            """
+    using Test
+    using TerminalClock, Dates
+    @test length(TerminalClock.FONTS) == 4
+    dt = DateTime(2021, 11, 15, 12, 34, 56, 7)
+    txt = joinpath("references", "UnicodeBox", "clock.txt")
+    @test clock(dt) == join(readlines(txt), "\n")
+""",
+        )
+
         # test for clear_dials
         activate_and_run(
             project_dir,
@@ -133,6 +192,7 @@ end
             """
     using Test
     using TerminalClock, Dates
+    @test length(TerminalClock.FONTS) == 3
     dt = DateTime(2021, 11, 15, 12, 34, 56, 7)
     str = clock(dt)
     txt = joinpath("references", "ASCII", "clock.txt")
@@ -145,6 +205,9 @@ end
 """,
         )
     end # with_temp_depot
+    prefs = isfile(local_prefs_toml) ? TOML.parsefile(local_prefs_toml) : Dict()
+    @test !haskey(get(prefs, "TerminalClock", Dict()), "tomlfiles")
+    @test !haskey(get(prefs, "TerminalClock", Dict()), "tomlfile")
 end
 
 @testset "countdown timing" begin
