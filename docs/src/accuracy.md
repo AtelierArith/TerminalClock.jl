@@ -27,8 +27,8 @@ recalculates each frame from elapsed time:
   output time reduce the next wait.
 - If rendering misses a deadline, the next iteration samples the current elapsed
   time. It does not replay every missed frame.
-- Line-clearing escape sequences are batched, and frame height is calculated once
-  rather than formatting a second copy of every frame.
+- Each refresh sends one screen-clearing escape sequence, so no per-frame height
+  has to be computed.
 
 This prevents per-frame delay from accumulating into the timer's elapsed-time
 calculation. It cannot guarantee when an OS schedules the process or when a

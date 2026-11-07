@@ -225,7 +225,7 @@ end
                 push!(frames, (ticks[] / 1e9, shown))
                 ticks[] += render_ns
             end,
-            clear=_ -> nothing)
+            clear=() -> nothing)
         return frames, waits, ticks[] / 1e9
     end
 
@@ -271,7 +271,7 @@ include("verification.jl")
             ticks[] += 20_000_000 # rendering delay must count as elapsed time
             length(shown) == 601 && throw(InterruptException())
         end,
-        clear=_ -> nothing)
+        clear=() -> nothing)
     @test first(shown) == Time(0)
     @test last(shown) == Time(0, 1)
     @test shown[2] == Time(0, 0, 0, 100)
@@ -281,6 +281,48 @@ include("verification.jl")
 end
 
 using TerminalClock: _displaywidth, Dial, Font, load_font, clock_frame, stopwatch_frame
+
+using TerminalClock: FONTS
+
+@testset "live display switches dials by terminal size" begin
+    sizes = [(40, 200), (3, 40), (2, 8)]   # large / keycap (width 14) / text
+    calls = Ref(0)
+    ticks = Ref(UInt64(0))
+    io = IOBuffer()
+    TerminalClock._countdown(Time(0, 0, 2); io,
+        now_ns=() -> ticks[],
+        wait=seconds -> (ticks[] += round(UInt64, seconds * 1e9)),
+        termsize=() -> sizes[(calls[] += 1)])
+    out = String(take!(io))
+    frames = split(out, TerminalClock.CLEAR_SCREEN; keepempty=false)
+    @test startswith(out, TerminalClock.CLEAR_SCREEN)
+    @test length(frames) == 3
+    @test frames[1] == clock(Time(0, 0, 2)) * "\n"
+    @test frames[2] == clock_frame(FONTS[2], Time(0, 0, 1)) * "\n"
+    @test frames[3] == "00:00:00\n"
+end
+
+@testset "stopwatch live display uses stopwatch frames" begin
+    io = IOBuffer()
+    n = Ref(0)
+    TerminalClock._stopwatch(0.1; io,
+        now_ns=() -> UInt64(0), wait=_ -> nothing,
+        termsize=() -> ((n[] += 1) > 1 && throw(InterruptException()); (2, 20)))
+    # The first frame is keycap (width 16 <= 20). On the second pass termsize
+    # throws during render, after the screen was cleared.
+    @test String(take!(io)) == TerminalClock.CLEAR_SCREEN *
+          stopwatch_frame(FONTS[2], Time(0)) * "\n" * TerminalClock.CLEAR_SCREEN
+end
+
+@testset "clock live display leaves the last frame" begin
+    io = IOBuffer()
+    n = Ref(0)
+    TerminalClock._clock(; io, now=() -> DateTime(2026, 1, 1, 12, 34, 56),
+        wait=_ -> (n[] += 1) == 2 && throw(InterruptException()),
+        termsize=() -> (2, 10))   # keycap (width 14) does not fit, so text
+    @test String(take!(io)) == repeat(TerminalClock.CLEAR_SCREEN * "12:34:56\n", 2)
+end
+
 
 @testset "displaywidth" begin
     @test _displaywidth("12:34") == 5

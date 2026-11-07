@@ -21,7 +21,7 @@ TerminalClock._stopwatch(0.01;
         push!(samples, (actual, displayed_ms / 1000))
         actual >= 60 && throw(InterruptException())
     end,
-    clear=_ -> nothing)
+    clear=() -> nothing)
 errors = [actual - displayed for (actual, displayed) in samples]
 println("frames: ", length(samples),
         ", elapsed seconds: ", samples[end][1],

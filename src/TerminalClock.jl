@@ -123,18 +123,12 @@ n2d(n::Int, ::Val{:Large}) = n2d(DIALS_LARGE, n)
 n2d(n::Int, ::Val{:Small}) = n2d(DIALS_SMALL, n)
 n2d(n::Int) = n2d(n, :Large)
 
-function clearline(; move_up::Bool=false)
-    buf = IOBuffer()
-    print(buf, "\x1b[2K") # clear line
-    print(buf, "\x1b[999D") # rollback the cursor
-    move_up && print(buf, "\x1b[1A") # move up
-    print(buf |> take! |> String)
-end
+# Clear the whole screen and home the cursor. Live displays assume a pane of
+# their own, so there is no line-by-line bookkeeping to go wrong on resize.
+const CLEAR_SCREEN = "\e[H\e[2J"
 
-function clearlines(H::Integer)
-    # Send cursor movement in one write rather than one write per line.
-    print(repeat("\x1b[2K\x1b[999D\x1b[1A", H))
-end
+_live_frame(fonts, frame, termsize::Tuple{Int,Int})::String =
+    frame(select_font(fonts, frame, termsize))
 
 """
     clock()
@@ -143,6 +137,11 @@ end
 
 Display the current local wall-clock time as `HH:MM:SS` until Ctrl+C.
 The live display refreshes approximately every 0.5 seconds.
+
+The live display clears the whole screen on every refresh, so run it in a pane
+of its own. If the terminal is too small for the dial, it switches to the next
+smaller candidate (down to plain text) automatically. The last frame stays on
+screen after exit.
 
 Passing a `Time` or `DateTime` instead returns one dial frame without printing
 or sleeping; the date and subsecond fields are ignored.
@@ -236,6 +235,11 @@ part. Remaining seconds are rounded up. A monotonic clock prevents rendering
 and scheduler delays from accumulating; a slow terminal can delay an update.
 There is no extra sleep after zero. Press Ctrl+C to stop early.
 
+The live display clears the whole screen on every refresh, so run it in a pane
+of its own. If the terminal is too small for the dial, it switches to the next
+smaller candidate (down to plain text) automatically. The last frame stays on
+screen after exit.
+
 # Examples
 
 These calls block while the timer runs:
@@ -256,10 +260,12 @@ end
 
 # Keep time independently of rendering and scheduler delays. Injectable callbacks
 # let tests exercise long durations and slow terminals without waiting in real time.
-function _countdown(t::Time; now_ns=time_ns, wait=sleep,
-                    render=t -> println(clock(t)), clear=clearlines)
+function _countdown(t::Time; now_ns=time_ns, wait=sleep, io::IO=stdout,
+                    fonts=FONTS, termsize=() -> displaysize(io),
+                    clear=() -> print(io, CLEAR_SCREEN),
+                    render=t -> println(io, _live_frame(
+                        fonts, f -> clock_frame(f, t), termsize())))
     duration_ns = Dates.value(t)
-    height = length(split(clock(t), "\n"))
     start = now_ns()
     try
         while true
@@ -267,6 +273,7 @@ function _countdown(t::Time; now_ns=time_ns, wait=sleep,
             remaining = max(Int128(duration_ns) - Int128(elapsed), 0)
             seconds = cld(remaining, 1_000_000_000)
             shown = Time(0) + Second(seconds)
+            clear()
             render(shown)
             remaining == 0 && break
 
@@ -274,7 +281,6 @@ function _countdown(t::Time; now_ns=time_ns, wait=sleep,
             boundary = duration_ns - (seconds - 1) * 1_000_000_000
             delay = max(Int128(boundary) - Int128(now_ns() - start), 0)
             delay > 0 && wait(Float64(delay) / 1e9)
-            clear(height)
         end
     catch e
         e isa InterruptException || rethrow()
@@ -288,23 +294,25 @@ _elapsed_time(ns::Unsigned) =
     Time(0) + Nanosecond(Int64(ns % UInt64(86_400_000_000_000)))
 
 function _stopwatch(duration::AbstractFloat; now_ns=time_ns, wait=sleep,
-                    render=t -> println(stopwatch(t)), clear=clearlines)
+                    io::IO=stdout, fonts=FONTS, termsize=() -> displaysize(io),
+                    clear=() -> print(io, CLEAR_SCREEN),
+                    render=t -> println(io, _live_frame(
+                        fonts, f -> stopwatch_frame(f, t), termsize())))
     isfinite(duration) && duration > 0 ||
         throw(ArgumentError("refresh interval must be finite and positive"))
-    height = length(split(stopwatch(Time(0)), "\n"))
     interval_ns = max(round(Int128, duration * 1e9), 1)
     start = now_ns()
     try
         while true
             elapsed = now_ns() - start
             t = _elapsed_time(elapsed)::Time
+            clear()
             render(t)
             # Schedule from the origin, so rendering and clearing do not add
             # to every refresh interval. Missed deadlines trigger a fresh frame.
             deadline = (fld(Int128(elapsed), interval_ns) + 1) * interval_ns
             delay = deadline - Int128(now_ns() - start)
             delay > 0 && wait(Float64(delay) / 1e9)
-            clear(height)
         end
     catch e
         e isa InterruptException || rethrow()
@@ -314,19 +322,23 @@ end
 
 stopwatch(duration::AbstractFloat=0.01) = _stopwatch(duration)
 
-function clock()
-    while true
-        try
-            str = clock(Dates.now())
-            println(str)
-            sleep(0.5)
-            H = length(split(str, "\n"))
-            clearlines(H)
-        catch e
-            isa(e, InterruptException) || error(e)
-            break
+function _clock(; now=Dates.now, wait=sleep, io::IO=stdout, fonts=FONTS,
+                termsize=() -> displaysize(io),
+                clear=() -> print(io, CLEAR_SCREEN),
+                render=t -> println(io, _live_frame(
+                    fonts, f -> clock_frame(f, t), termsize())))
+    try
+        while true
+            clear()
+            render(Dates.Time(now()))
+            wait(0.5)
         end
+    catch e
+        e isa InterruptException || rethrow()
     end
+    return nothing
 end
+
+clock() = _clock()
 
 end # module

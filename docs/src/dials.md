@@ -20,6 +20,12 @@ Restart Julia, activate the same environment, and import TerminalClock again.
 The dials are loaded when the module is imported, so an already-running clock
 does not change fonts.
 
+The live displays choose among the loaded dials by terminal size on every
+refresh: the first candidate dial is used when it fits, then `Keycap`, then
+`Text`, so a small pane switches to a smaller dial automatically. A frame fits
+when it has at most one row fewer than the terminal height and no more columns
+than its width. The last candidate is used when nothing fits.
+
 To restore the default:
 
 ```julia
