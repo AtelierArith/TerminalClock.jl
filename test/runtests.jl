@@ -216,3 +216,50 @@ include("verification.jl")
         @test_throws ArgumentError stopwatch(duration)
     end
 end
+
+using TerminalClock: _displaywidth, Dial, Font, load_font, clock_frame, stopwatch_frame
+
+@testset "displaywidth" begin
+    @test _displaywidth("12:34") == 5
+    @test _displaywidth("1️⃣") == 2
+    @test _displaywidth("1️⃣2️⃣:") == 5
+    @test _displaywidth("🟥⬛") == 4
+    @test _displaywidth("█▒░") == 3
+end
+
+@testset "Dial pads rows to equal width" begin
+    @test Dial(["abc", "a"]).str == "abc\na  "
+    @test Dial(["1️⃣", "x"]).str == "1️⃣\nx "
+end
+
+const DIGIT_KEYS = ["zero", "one", "two", "three", "four",
+                    "five", "six", "seven", "eight", "nine"]
+function tiny_text_toml(sep)
+    large = Dict{String,Any}(k => [string(n)] for (n, k) in zip(0:9, DIGIT_KEYS))
+    large["colon"] = [":"]
+    sep === nothing || (large["separator"] = sep)
+    return Dict{String,Any}("Large" => large)
+end
+
+@testset "separator defaults to a space" begin
+    font = Font(tiny_text_toml(nothing))      # no separator
+    @test clock_frame(font, Time(12, 34, 56)) == "1 2 : 3 4 : 5 6"
+end
+
+@testset "separator joins glyphs" begin
+    font = Font(tiny_text_toml(""))
+    @test clock_frame(font, Time(12, 34, 56)) == "12:34:56"
+    @test stopwatch_frame(font, Time(1, 2, 3, 456)) == "02:03:456"
+end
+
+@testset "stopwatch_frame uses the Large separator" begin
+    toml = tiny_text_toml("")
+    toml["Small"] = merge(copy(toml["Large"]), Dict("separator" => "_", "colon" => ["."]))
+    @test stopwatch_frame(Font(toml), Time(0, 2, 3, 456)) == "02:03.456"
+end
+
+@testset "load_font reads a TOML file" begin
+    font = load_font(joinpath(pkgdir(TerminalClock), "src", "dials", "ASCII.toml"))
+    @test font isa Font
+    @test clock_frame(font, Time(12, 34, 56)) == clock(Time(12, 34, 56))
+end

@@ -44,9 +44,12 @@ function load_dials()
     return toml
 end
 
-const toml = load_dials()
-const DIALS_LARGE = from_dict(Dials, toml["Large"])
-const DIALS_SMALL = from_dict(Dials, get(toml, "Small", toml["Large"]))
+load_font(path::AbstractString) = Font(TOML.parsefile(path))
+
+# Placeholder until the font list is built from all bundled dials.
+const FONTS = [Font(load_dials())]
+const DIALS_LARGE = FONTS[1].large
+const DIALS_SMALL = FONTS[1].small
 
 colon(dial::Dials) = Dial(getfield(dial, :colon))
 
@@ -107,17 +110,14 @@ true
 """
 clock(dt::DateTime) = clock(Time(dt))
 
-function clock(t::Time)
-    buf = IOBuffer()
-    h = hour(t)
-    m = minute(t)
-    s = second(t)
-    h1, h2 = n2d.(divrem(h, 10))
-    m1, m2 = n2d.(divrem(m, 10))
-    s1, s2 = n2d.(divrem(s, 10))
-    str = hcat(h1, h2, COLON_LARGE, m1, m2, COLON_LARGE, s1, s2).str
-    print(buf, str)
-    return buf |> take! |> String
+clock(t::Time) = clock_frame(FONTS[1], t)
+
+function clock_frame(font::Font, t::Time)::String
+    h1, h2 = n2d.(Ref(font.large), divrem(hour(t), 10))
+    m1, m2 = n2d.(Ref(font.large), divrem(minute(t), 10))
+    s1, s2 = n2d.(Ref(font.large), divrem(second(t), 10))
+    c = colon(font.large)
+    return _join(font.large.separator, h1, h2, c, m1, m2, c, s1, s2).str
 end
 
 """
@@ -142,22 +142,17 @@ julia> stopwatch(Time(1, 2, 3, 456)) == stopwatch(Time(0, 2, 3, 456))
 true
 ```
 """
-function stopwatch(t::Time)
-    buf = IOBuffer()
-    h = hour(t)
-    m = minute(t)
-    s = second(t)
-    ms = millisecond(t)
-    h1, h2 = n2d.(divrem(h, 10))
-    m1, m2 = n2d.(divrem(m, 10))
-    s1, s2 = n2d.(divrem(s, 10))
-    ms12, ms3_ = divrem(ms, 10)
-    ms3 = n2d.(ms3_, :Small)
-    ms1, ms2 = n2d.(divrem(ms12, 10), :Small)
+stopwatch(t::Time) = stopwatch_frame(FONTS[1], t)
 
-    str = hcat(m1, m2, COLON_LARGE, s1, s2, COLON_SMALL, ms1, ms2, ms3).str
-    print(buf, str)
-    return buf |> take! |> String
+function stopwatch_frame(font::Font, t::Time)::String
+    large, small = font.large, font.small
+    m1, m2 = n2d.(Ref(large), divrem(minute(t), 10))
+    s1, s2 = n2d.(Ref(large), divrem(second(t), 10))
+    ms12, ms3_ = divrem(millisecond(t), 10)
+    ms1, ms2 = n2d.(Ref(small), divrem(ms12, 10))
+    ms3 = n2d(small, ms3_)
+    return _join(large.separator, m1, m2, colon(large), s1, s2,
+                 colon(small), ms1, ms2, ms3).str
 end
 
 const Optional = Union{Nothing,Int}
