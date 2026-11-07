@@ -6,8 +6,8 @@ CurrentModule = TerminalClock
 
 ## Select a bundled font
 
-TerminalClock includes `ASCII.toml`, `ASCII2.toml`, and `UnicodeBox.toml` under
-`src/dials`. Select a file in the Julia environment where you use the package:
+TerminalClock includes `ASCII.toml`, `ASCII2.toml`, `UnicodeBox.toml`,
+`Keycap.toml`, and `Text.toml` under `src/dials`. Select a file in the Julia environment where you use the package:
 
 ```julia
 using TerminalClock
@@ -55,9 +55,23 @@ array of strings, one string per row.
   If omitted, it falls back to `[Large]`.
 - Use the same number of rows for every glyph in both tables. Concatenation
   truncates to the shortest glyph; it does not pad missing rows.
-- Keep consistent visible widths within a table. Avoid tabs, control codes,
-  combining characters, or wide characters unless your terminal handles them
-  as intended.
+- Rows of a glyph are padded on the right with spaces when the file is loaded,
+  so every glyph in a table gets a consistent visible width. Avoid tabs,
+  control codes, or combining characters. A keycap emoji such as `"1️⃣"` is
+  treated as width 2.
+- The optional `separator` key (a string) is placed between glyphs. If omitted
+  it is a single space; `separator = ""` packs glyphs together.
+- A one-line dial is written with one-element arrays. This is an excerpt of
+  `Text.toml`:
+
+  ```toml
+  [Large]
+  separator = ""
+  zero = ["0"]
+  one = ["1"]
+  # ... two to nine ...
+  colon = [":"]
+  ```
 
 Here is a complete, compact three-row font. Save the block as `TinyDials.toml`,
 select its absolute path with `set_dials`, and restart Julia:

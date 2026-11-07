@@ -263,3 +263,32 @@ end
     @test font isa Font
     @test clock_frame(font, Time(12, 34, 56)) == clock(Time(12, 34, 56))
 end
+
+dialpath(name) = joinpath(dirname(pathof(TerminalClock)), "dials", name)
+
+@testset "bundled one-line dials" begin
+    text = load_font(dialpath("Text.toml"))
+    @test clock_frame(text, Time(12, 34, 56)) == "12:34:56"
+    @test stopwatch_frame(text, Time(12, 34, 56, 789)) == "34:56:789"
+    keycap = load_font(dialpath("Keycap.toml"))
+    k(n) = "$(n)️⃣"
+    @test clock_frame(keycap, Time(12, 34, 56)) == k(1)*k(2)*":"*k(3)*k(4)*":"*k(5)*k(6)
+end
+
+@testset "bundled dials have equal row widths" begin
+    for file in readdir(joinpath(dirname(pathof(TerminalClock)), "dials"))
+        toml = TOML.parsefile(dialpath(file))
+        for (table, glyphs) in toml, (key, rows) in glyphs
+            key == "separator" && continue
+            @test length(unique(_displaywidth.(rows))) == 1
+        end
+    end
+end
+
+@testset "ASCII2 references" begin
+    ascii2 = load_font(dialpath("ASCII2.toml"))
+    @test clock_frame(ascii2, Time(12, 34, 56)) ==
+          join(readlines(joinpath(@__DIR__, "references", "ASCII2", "clock.txt")), "\n")
+    @test stopwatch_frame(ascii2, Time(12, 34, 56, 789)) ==
+          join(readlines(joinpath(@__DIR__, "references", "ASCII2", "stopwatch.txt")), "\n")
+end

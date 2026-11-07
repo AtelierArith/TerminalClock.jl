@@ -1,0 +1,29 @@
+# Keycap.toml
+# One-line keycap emoji digits (each counts as display width 2).
+[Large]
+separator = ""
+zero = ["0\ufe0f\u20e3"]
+one = ["1\ufe0f\u20e3"]
+two = ["2\ufe0f\u20e3"]
+three = ["3\ufe0f\u20e3"]
+four = ["4\ufe0f\u20e3"]
+five = ["5\ufe0f\u20e3"]
+six = ["6\ufe0f\u20e3"]
+seven = ["7\ufe0f\u20e3"]
+eight = ["8\ufe0f\u20e3"]
+nine = ["9\ufe0f\u20e3"]
+colon = [":"]
+
+[Small]
+separator = ""
+zero = ["0\ufe0f\u20e3"]
+one = ["1\ufe0f\u20e3"]
+two = ["2\ufe0f\u20e3"]
+three = ["3\ufe0f\u20e3"]
+four = ["4\ufe0f\u20e3"]
+five = ["5\ufe0f\u20e3"]
+six = ["6\ufe0f\u20e3"]
+seven = ["7\ufe0f\u20e3"]
+eight = ["8\ufe0f\u20e3"]
+nine = ["9\ufe0f\u20e3"]
+colon = [":"]
