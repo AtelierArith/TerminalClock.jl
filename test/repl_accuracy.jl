@@ -29,7 +29,7 @@ end
 
 function digit_maps()
     dials = TOML.parsefile(TerminalClock.default_tomlfile())
-    TerminalClock.toml == dials ||
+    TerminalClock.load_dials() == dials ||
         error("Run this optional test with the default ASCII dial preferences.")
     names = ["zero", "one", "two", "three", "four", "five",
              "six", "seven", "eight", "nine"]
