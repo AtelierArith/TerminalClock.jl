@@ -1,6 +1,6 @@
 name = "TerminalClock"
 uuid = "65687e93-20ea-45b9-bbc3-ed39219e1d43"
-version = "0.4.2"
+version = "0.4.3"
 authors = ["Satoshi Terasaki <terasakisatoshi.math@gmail.com>"]
 
 [deps]
@@ -11,13 +11,13 @@ TOML = "fa267f1f-6049-4f14-aa54-33bafae1ed76"
 
 [compat]
 Aqua = "0.8"
-JET = "0.9, 0.10, 0.11, 0.12"
+Configurations = "0.17.0"
 Dates = "1.10"
+JET = "0.9, 0.10, 0.11, 0.12"
 Pkg = "1.10"
+Preferences = "1.2.2"
 TOML = "1"
 Test = "1.10"
-Configurations = "0.17.0"
-Preferences = "1.2.2"
 julia = "1.10"
 
 [extras]
